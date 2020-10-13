@@ -45,15 +45,25 @@ namespace PeterDB {
             delete[] name;
             return RC_FILE_NAME_NOT_EXIST;
         };
-        return -1;
     }
 
     RC PagedFileManager::openFile(const std::string &fileName, FileHandle &fileHandle) {
-        return -1;
+        char * name = String_to_char_point(fileName);
+        if (access(name, F_OK) == 0) {
+            FILE * pFile = std::fopen(name, "w");
+            fileHandle.storeFilePointer(pFile);
+            delete[] name;
+            return SUCCESS;
+        } else {
+            delete[] name;
+            return RC_FILE_NAME_NOT_EXIST;
+        };
     }
 
     RC PagedFileManager::closeFile(FileHandle &fileHandle) {
-        return -1;
+        std::fclose(fileHandle.filePointer);
+        fileHandle.filePointer = NULL;
+        return SUCCESS;
     }
 
     FileHandle::FileHandle() {
@@ -63,6 +73,10 @@ namespace PeterDB {
     }
 
     FileHandle::~FileHandle() = default;
+
+    void FileHandle::storeFilePointer(FILE *pfile) {
+        FileHandle::filePointer = pfile;
+    }
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
         return -1;

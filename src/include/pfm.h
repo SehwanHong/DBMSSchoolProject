@@ -34,7 +34,7 @@ namespace PeterDB {
         PagedFileManager(const PagedFileManager &);                         // Prevent construction by copying
         PagedFileManager &operator=(const PagedFileManager &);              // Prevent assignment
 
-        char* String_to_char_point(const std::string & str);
+        char* String_to_char_point(const std::string & str);                // change String to char * for different functions
 
     };
 
@@ -48,12 +48,16 @@ namespace PeterDB {
         FileHandle();                                                       // Default constructor
         ~FileHandle();                                                      // Destructor
 
+        void storeFilePointer(FILE * pfile);                                // Function that store Pointer to the file
+
         RC readPage(PageNum pageNum, void *data);                           // Get a specific page
         RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
         RC appendPage(const void *data);                                    // Append a specific page
         unsigned getNumberOfPages();                                        // Get the number of pages in the file
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
                                 unsigned &appendPageCount);                 // Put current counter values into variables
+
+        FILE * filePointer;                                                 // Pointer to the file
     };
 
 } // namespace PeterDB
