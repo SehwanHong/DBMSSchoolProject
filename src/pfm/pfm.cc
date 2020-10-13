@@ -14,11 +14,37 @@ namespace PeterDB {
 
     PagedFileManager &PagedFileManager::operator=(const PagedFileManager &) = default;
 
+    char* PagedFileManager::String_to_char_point(const std::string & str) {
+        int len = str.size();
+        char * pchar = new char(len+1);
+        std::copy(str.begin(), str.end(), pchar);
+        pchar[len] = '\0';
+        return pchar;
+    }
+
     RC PagedFileManager::createFile(const std::string &fileName) {
-        return -1;
+        char * name = String_to_char_point(fileName);
+        if (access(name, F_OK) == 0) {
+            delete[] name;
+            return RC_FILE_NAME_EXIST;
+        } else {
+            FILE * pFile = std::fopen(name, "w");
+            std::fclose(pFile);
+            delete[] name;
+            return SUCCESS;
+        };
     }
 
     RC PagedFileManager::destroyFile(const std::string &fileName) {
+        char * name = String_to_char_point(fileName);
+        if (access(name, F_OK) == 0) {
+            std::remove(name);
+            delete[] name;
+            return SUCCESS;
+        } else {
+            delete[] name;
+            return RC_FILE_NAME_NOT_EXIST;
+        };
         return -1;
     }
 
