@@ -28,7 +28,7 @@ namespace PeterDB {
             delete[] name;
             return RC_FILE_NAME_EXIST;
         } else {
-            FILE * pFile = std::fopen(name, "w");
+            FILE * pFile = std::fopen(name, "brw");
             std::fclose(pFile);
             delete[] name;
             return SUCCESS;
@@ -50,7 +50,7 @@ namespace PeterDB {
     RC PagedFileManager::openFile(const std::string &fileName, FileHandle &fileHandle) {
         char * name = String_to_char_point(fileName);
         if (access(name, F_OK) == 0) {
-            FILE * pFile = std::fopen(name, "w");
+            FILE * pFile = std::fopen(name, "brw");
             fileHandle.storeFilePointer(pFile);
             delete[] name;
             return SUCCESS;
@@ -70,12 +70,41 @@ namespace PeterDB {
         readPageCounter = 0;
         writePageCounter = 0;
         appendPageCounter = 0;
+        numberOfPages = 0;
     }
 
     FileHandle::~FileHandle() = default;
 
     void FileHandle::storeFilePointer(FILE *pfile) {
-        FileHandle::filePointer = pfile;
+        filePointer = pfile;
+        if (std::feof(pfile)) {
+            unsigned * header = new unsigned[PAGE_SIZE/8];
+            configureHeader(header);
+            std::fwrite(header, sizeof(unsigned),PAGE_SIZE/8, pfile);
+            std::rewind(filePointer);
+            delete [] header;
+        } else {
+            getHeader();
+        }
+    }
+
+    void FileHandle::configureHeader(unsigned &header){
+        unsigned * tempPointer = header;
+        tempPointer[0] = readPageCounter;
+        tempPointer[1] = writePageCounter;
+        tempPointer[2] = appendPageCounter;
+        tempPointer[3] = numberOfPages;
+        for(int i = 4; i < PAGE_SIZE/8; i++){
+            tempPointer[i] = 0;
+        }
+    }
+
+    void FileHandle::getHeader(){
+        fscanf(filePointer,"%u", &readPageCounter);
+        fscanf(filePointer,"%u", &writePageCounter);
+        fscanf(filePointer,"%u", &appendPageCounter);
+        fscanf(filePointer,"%u", &numberOfPages);
+        rewind(filePointer);
     }
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {

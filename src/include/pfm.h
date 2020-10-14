@@ -44,11 +44,14 @@ namespace PeterDB {
         unsigned readPageCounter;
         unsigned writePageCounter;
         unsigned appendPageCounter;
+        unsigned numberOfPages;
 
         FileHandle();                                                       // Default constructor
         ~FileHandle();                                                      // Destructor
 
         void storeFilePointer(FILE * pfile);                                // Function that store Pointer to the file
+        void configureHeader(unsigned &header);                             // configure Header to save to file
+        void getHeader();                                                   // get Header from existing file
 
         RC readPage(PageNum pageNum, void *data);                           // Get a specific page
         RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
