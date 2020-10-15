@@ -6,6 +6,9 @@
 #define SUCCESS 0
 #define RC_FILE_NAME_EXIST 1
 #define RC_FILE_NAME_NOT_EXIST 2
+#define RC_FILE_OPEN_FAIL 3
+#define RC_READ_NONEXISTENT_PAGE 4
+#define RC_WRITE_NONEXISTENT_PAGE 5
 
 
 #include <string>
@@ -49,9 +52,11 @@ namespace PeterDB {
         FileHandle();                                                       // Default constructor
         ~FileHandle();                                                      // Destructor
 
-        void storeFilePointer(FILE * pfile);                                // Function that store Pointer to the file
-        void configureHeader(unsigned &header);                             // configure Header to save to file
+        void generateHeader(char * fileName);                                              // Function that store Pointer to the file
+        void configureHeader(unsigned * header);                            // configure Header to save to file
         void getHeader();                                                   // get Header from existing file
+        void saveHeader();                                                  // Save current number of pages, read write append count
+        RC closeFile();
 
         RC readPage(PageNum pageNum, void *data);                           // Get a specific page
         RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
@@ -60,7 +65,7 @@ namespace PeterDB {
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
                                 unsigned &appendPageCount);                 // Put current counter values into variables
 
-        FILE * filePointer;                                                 // Pointer to the file
+        char * savedFileName;                                                    // Pointer to the file
     };
 
 } // namespace PeterDB
