@@ -113,6 +113,7 @@ namespace PeterDBTesting {
         PeterDB::RID rid;
         inBuffer = malloc(1000);
         int numRecords = 2000;
+        //int numRecords = 20;
 
         // clean caches
         rids.clear();
@@ -131,7 +132,7 @@ namespace PeterDBTesting {
 
         // Insert 2000 records into file
         for (int i = 0; i < numRecords; i++) {
-
+            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
             // Test insert Record
             int size = 0;
             memset(inBuffer, 0, 1000);
@@ -151,6 +152,8 @@ namespace PeterDBTesting {
         outBuffer = malloc(1000);
 
         for (int i = 0; i < numRecords; i++) {
+            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
+
             memset(inBuffer, 0, 1000);
             memset(outBuffer, 0, 1000);
             ASSERT_EQ(rbfm.readRecord(fileHandle, recordDescriptor, rids[i], outBuffer), success)
@@ -164,6 +167,11 @@ namespace PeterDBTesting {
 
             int size = 0;
             prepareLargeRecord(recordDescriptor.size(), nullsIndicator, i, inBuffer, &size);
+            for (int k = 0 ; k < size ; k ++) {
+                char out = (char) *((char*)outBuffer+k);
+                char in = (char) *((char*)inBuffer+k);
+                ASSERT_EQ(out, in) << "the read data should equal at " << k;
+            }
             ASSERT_EQ(memcmp(outBuffer, inBuffer, sizes[i]), 0) << "the read data should match the inserted data";
         }
 
@@ -181,6 +189,7 @@ namespace PeterDBTesting {
         PeterDB::RID rid;
         inBuffer = malloc(1000);
         int numRecords = 10000;
+        //int numRecords = 100;
 
         // clean caches
         rids.clear();
@@ -197,8 +206,9 @@ namespace PeterDBTesting {
         // NULL field indicator
         nullsIndicator = initializeNullFieldsIndicator(recordDescriptor);
 
-        // Insert 2000 records into file
+        // Insert 10000 records into file
         for (int i = 0; i < numRecords; i++) {
+            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
 
             // Test insert Record
             int size = 0;
@@ -219,6 +229,8 @@ namespace PeterDBTesting {
         outBuffer = malloc(1000);
 
         for (int i = 0; i < numRecords; i++) {
+            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
+
             memset(inBuffer, 0, 1000);
             memset(outBuffer, 0, 1000);
             ASSERT_EQ(rbfm.readRecord(fileHandle, recordDescriptor, rids[i], outBuffer), success)
@@ -233,6 +245,11 @@ namespace PeterDBTesting {
 
             int size = 0;
             prepareLargeRecord(recordDescriptor.size(), nullsIndicator, i, inBuffer, &size);
+            for (int k = 0 ; k < size ; k ++) {
+                char out = (char) *((char*)outBuffer+k);
+                char in = (char) *((char*)inBuffer+k);
+                ASSERT_EQ(out, in) << "the read data should equal";
+            }
             ASSERT_EQ(memcmp(outBuffer, inBuffer, sizes[i]),
                       0) << "the read data should match the inserted data";
         }

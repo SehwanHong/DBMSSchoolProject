@@ -2,6 +2,8 @@
 #define _rbfm_h_
 
 #include <vector>
+#include <cstring>
+#include <fstream>
 
 #include "pfm.h"
 
