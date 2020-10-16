@@ -184,7 +184,6 @@ namespace PeterDB {
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fread(data, 1, PAGE_SIZE, filePointer); // read the data from start of page to next page
         std::fclose(filePointer);
-        saveHeader();
         filesizecheck();
         if(temp != filesize) { // check if filesize have changed with the write move
             return RC_FILE_SIZE_ERROR;
@@ -209,7 +208,6 @@ namespace PeterDB {
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fwrite(data, 1, PAGE_SIZE, filePointer); //overwrite data
         std::fclose(filePointer);
-        saveHeader();
 
         filesizecheck();
         if(temp != filesize) {
@@ -231,7 +229,6 @@ namespace PeterDB {
 
         std::fwrite(data, 1, PAGE_SIZE, filePointer); // write a new data
         std::fclose(filePointer);
-        saveHeader();
         filesizecheck();
         if(temp+PAGE_SIZE != filesize) { // check if file size have increased with factor of PAGE_SIZE
             return RC_FILE_SIZE_ERROR;
@@ -244,11 +241,9 @@ namespace PeterDB {
     }
 
     RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
-        getHeader();
         readPageCount = readPageCounter;
         writePageCount = writePageCounter;
         appendPageCount = appendPageCounter;
-        saveHeader();
         return SUCCESS;
     }
 
