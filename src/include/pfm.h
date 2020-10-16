@@ -52,10 +52,10 @@ namespace PeterDB {
         FileHandle();                                                       // Default constructor
         ~FileHandle();                                                      // Destructor
 
-        RC generateHeader(char * fileName);                                              // Function that store Pointer to the file
+        RC generateHeader(const std::string &fileName);                     // Function that store Pointer to the file
         void configureHeader(unsigned * header);                            // configure Header to save to file
         void getHeader();                                                   // get Header from existing file
-        RC saveHeader();                                                  // Save current number of pages, read write append count
+        RC saveHeader();                                                    // Save current number of pages, read write append count
         RC closeFile();                                                     // free saved file name and store current values
 
         unsigned filesize;
@@ -68,7 +68,7 @@ namespace PeterDB {
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
                                 unsigned &appendPageCount);                 // Put current counter values into variables
 
-        char * savedFileName;                                                    // Pointer to the file
+        char * savedFileName;                                               // Pointer to the file
     };
 
 } // namespace PeterDB
