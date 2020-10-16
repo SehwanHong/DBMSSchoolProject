@@ -117,6 +117,7 @@ namespace PeterDBTesting {
         inBuffer = malloc(PAGE_SIZE);
         generateData(inBuffer, PAGE_SIZE);
         ASSERT_EQ(fileHandle.appendPage(inBuffer), success) << "Appending a page should succeed.";
+        free(inBuffer);
 
         ASSERT_TRUE(getFileSize(fileName) % PAGE_SIZE == 0) << "File should be based on PAGE_SIZE.";
         ASSERT_GT(getFileSize(fileName), fileSizeBeforeAppend) << "File size should have been increased";
@@ -185,6 +186,7 @@ namespace PeterDBTesting {
         inBuffer = malloc(PAGE_SIZE);
         generateData(inBuffer, PAGE_SIZE);
         ASSERT_EQ(fileHandle.appendPage(inBuffer), success) << "Appending a page should succeed.";
+        free(inBuffer);
         ASSERT_TRUE(getFileSize(fileName) % PAGE_SIZE == 0) << "File should be based on PAGE_SIZE.";
         ASSERT_GT(getFileSize(fileName), fileSizeBeforeAppend) << "File size should have been increased";
 

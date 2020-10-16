@@ -1,0 +1,9 @@
+libdir=/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/lib
+includedir=/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include
+
+Name: gtest
+Description: GoogleTest (without main() function)
+Version: 1.10.0
+URL: https://github.com/google/googletest
+Libs: -L${libdir} -lgtest -lpthread
+Cflags: -I${includedir} -DGTEST_HAS_PTHREAD=1

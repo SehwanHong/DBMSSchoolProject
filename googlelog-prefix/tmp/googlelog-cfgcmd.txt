@@ -1,0 +1,1 @@
+cmd='/usr/bin/cmake;-DCMAKE_INSTALL_PREFIX=/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11;-DWITH_GFLAGS=OFF;-GUnix Makefiles;<SOURCE_DIR><SOURCE_SUBDIR>'

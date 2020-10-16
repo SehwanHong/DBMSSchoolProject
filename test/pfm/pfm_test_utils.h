@@ -36,6 +36,7 @@ namespace PeterDBTesting {
         }
 
         void TearDown() override {
+            int i = 0;
 
             // Destruct the buffers
             free(inBuffer);
