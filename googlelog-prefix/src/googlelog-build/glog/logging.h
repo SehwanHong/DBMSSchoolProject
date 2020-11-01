@@ -280,13 +280,12 @@ typedef unsigned __int64 uint64;
 //
 // Log lines have this form:
 //
-//     Lyyyymmdd hh:mm:ss.uuuuuu threadid file:line] msg...
+//     Lmmdd hh:mm:ss.uuuuuu threadid file:line] msg...
 //
 // where the fields are defined as follows:
 //
 //   L                A single character, representing the log level
 //                    (eg 'I' for INFO)
-//   yyyy             The year
 //   mm               The month (zero padded; ie May is '05')
 //   dd               The day (zero padded)
 //   hh:mm:ss.uuuuuu  Time in hours, minutes and fractional seconds
@@ -330,9 +329,6 @@ typedef unsigned __int64 uint64;
   }                                                                     \
   using fLS::FLAGS_##name
 #endif
-
-// Set whether appending a timestamp to the log file name
-DECLARE_bool(timestamp_in_logfile_name);
 
 // Set whether log messages go to stderr instead of logfiles
 DECLARE_bool(logtostderr);
@@ -525,11 +521,6 @@ GOOGLE_GLOG_DLL_DECL void ShutdownGoogleLogging();
 
 // Install a function which will be called after LOG(FATAL).
 GOOGLE_GLOG_DLL_DECL void InstallFailureFunction(void (*fail_func)());
-
-// Enable/Disable old log cleaner.
-GOOGLE_GLOG_DLL_DECL void EnableLogCleaner(int overdue_days);
-GOOGLE_GLOG_DLL_DECL void DisableLogCleaner();
-
 
 class LogSink;  // defined below
 
@@ -1329,7 +1320,7 @@ inline void LogAtLevel(int const severity, std::string const &msg) {
 // reasonably good C++11 support, so we set LANG_CXX for it and
 // newer versions (_MSC_VER >= 1900).
 #if (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L || \
-     (defined(_MSC_VER) && _MSC_VER >= 1900)) && !defined(__UCLIBCXX_MAJOR__)
+     (defined(_MSC_VER) && _MSC_VER >= 1900))
 // Helper for CHECK_NOTNULL().
 //
 // In C++11, all cases can be handled by a single function. Since the value
@@ -1435,16 +1426,6 @@ class GOOGLE_GLOG_DLL_DECL LogSink {
   virtual void send(LogSeverity severity, const char* full_filename,
                     const char* base_filename, int line,
                     const struct ::tm* tm_time,
-                    const char* message, size_t message_len, int32 usecs) {
-    send(severity, full_filename, base_filename, line,
-         tm_time, message, message_len);
-  }
-  // This send() signature is obsolete.
-  // New implementations should define this in terms of
-  // the above send() method.
-  virtual void send(LogSeverity severity, const char* full_filename,
-                    const char* base_filename, int line,
-                    const struct ::tm* tm_time,
                     const char* message, size_t message_len) = 0;
 
   // Redefine this to implement waiting for
@@ -1466,15 +1447,7 @@ class GOOGLE_GLOG_DLL_DECL LogSink {
   // Can be useful to implement send().
   static std::string ToString(LogSeverity severity, const char* file, int line,
                               const struct ::tm* tm_time,
-                              const char* message, size_t message_len,
-                              int32 usecs);
-
-  // Obsolete
-  static std::string ToString(LogSeverity severity, const char* file, int line,
-                              const struct ::tm* tm_time,
-                              const char* message, size_t message_len) {
-    return ToString(severity, file, line, tm_time, message, message_len, 0);
-  }
+                              const char* message, size_t message_len);
 };
 
 // Add or remove a LogSink as a consumer of logging data.  Thread-safe.

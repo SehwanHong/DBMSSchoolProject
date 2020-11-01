@@ -188,6 +188,9 @@ namespace PeterDB {
         if(temp != filesize) { // check if filesize have changed with the write move
             return RC_FILE_SIZE_ERROR;
         }
+        if( (readPageCounter + appendPageCounter + writePageCounter) % 50 == 0 ) {
+            saveHeader();
+        }
         return SUCCESS;
     }
 
@@ -213,6 +216,9 @@ namespace PeterDB {
         if(temp != filesize) {
             return RC_FILE_SIZE_ERROR;
         }
+        if( (readPageCounter + appendPageCounter + writePageCounter) % 50 == 0 ) {
+            saveHeader();
+        }
         return SUCCESS;
     }
 
@@ -232,6 +238,9 @@ namespace PeterDB {
         filesizecheck();
         if(temp+PAGE_SIZE != filesize) { // check if file size have increased with factor of PAGE_SIZE
             return RC_FILE_SIZE_ERROR;
+        }
+        if( (readPageCounter + appendPageCounter + writePageCounter) % 50 == 0 ) {
+            saveHeader();
         }
         return SUCCESS;
     }

@@ -50,14 +50,14 @@ namespace PeterDB {
         memcpy(null_indicator, temp+offset, null_bytes);
         offset += null_bytes;
         for(int i = 0 ; i < length ; i++ ){
-            nullBit = null_indicator[length/8] & ((unsigned)1 << (unsigned) 7 - i % 8);
+            nullBit = null_indicator[i/8] & ((unsigned)1 << (unsigned) 7 - i % 8);
             if (!nullBit){
                 if (recordDescriptor[i].type == AttrType::TypeInt) {
                     offset += sizeof(int);
                 } else if (recordDescriptor[i].type == AttrType::TypeReal) {
                     offset += sizeof(float);
                 } else if (recordDescriptor[i].type == AttrType::TypeVarChar) {
-                    unsigned number_of_char = (unsigned) *(temp+offset);
+                    unsigned int number_of_char =  *((unsigned int * )(temp+offset));
                     offset += sizeof(int);
                     offset += number_of_char;
                 }
@@ -158,7 +158,8 @@ namespace PeterDB {
         memcpy(null_indicator, (char*)data+offset, null_bytes);
         offset += null_bytes;
         for(int i = 0 ; i < length ; i++ ){
-            nullBit = null_indicator[length/8] & ((unsigned)1 << (unsigned) 7 - i % 8);
+            unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
+            nullBit = null_indicator[i/8] & mask;
             out << recordDescriptor[i].name << ": ";
             if (!nullBit){
                 if (recordDescriptor[i].type == AttrType::TypeInt) {
