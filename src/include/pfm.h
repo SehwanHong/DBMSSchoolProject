@@ -10,6 +10,7 @@
 #define RC_READ_NONEXISTENT_PAGE 4
 #define RC_WRITE_NONEXISTENT_PAGE 5
 
+#define UNSIGNEDSIZE sizeof(unsigned)
 
 #include <string>
 #include <unistd.h>
@@ -30,6 +31,7 @@ namespace PeterDB {
         RC destroyFile(const std::string &fileName);                        // Destroy a file
         RC openFile(const std::string &fileName, FileHandle &fileHandle);   // Open a file
         RC closeFile(FileHandle &fileHandle);                               // Close a file
+        RC createFileHelper(char * fileName);
 
     protected:
         PagedFileManager();                                                 // Prevent construction

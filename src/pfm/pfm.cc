@@ -22,28 +22,31 @@ namespace PeterDB {
         return pointer;
     }
 
+    RC PagedFileManager::createFileHelper(char *fileName) {
+        FILE * pFile = std::fopen(fileName, "wb"); // create a binary file
+        unsigned* header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
+        for(int i = 0 ; i < 4; i++){ header[i] = 0; } // set first four values to zero read write append pages count
+        for(int i = 4 ; i < PAGE_SIZE/UNSIGNEDSIZE; i++){ header[i] = -1; } // else save -1 as hidden
+        std::fwrite(header, UNSIGNEDSIZE, PAGE_SIZE/UNSIGNEDSIZE, pFile);
+        delete[] header;
+        std::fclose(pFile);
+
+        pFile = std::fopen(fileName, "rb"); // check if file is save correctly with correct Page_size
+        std::fseek(pFile, 0, SEEK_END);
+        unsigned length = std::ftell(pFile);
+        if (length != PAGE_SIZE) {
+            return RC_FILE_SIZE_ERROR;
+        }
+        std::fclose(pFile);
+    }
+
     RC PagedFileManager::createFile(const std::string &fileName) {
         char * name = String_to_char_point(fileName);
         if (access(name, F_OK) == 0) { // check if the file name exists
             delete[] name;
             return RC_FILE_NAME_EXIST;
         } else {
-            FILE * pFile = std::fopen(name, "wb"); // create a binary file
-            unsigned* header = new unsigned[PAGE_SIZE/sizeof(unsigned)];
-            for(int i = 0 ; i < 4; i++){ header[i] = 0; } // set first four values to zero read write append pages count
-            for(int i = 4 ; i < PAGE_SIZE/sizeof(unsigned); i++){ header[i] = -1; } // else save -1 as hidden
-            std::fwrite(header, sizeof(unsigned), PAGE_SIZE/sizeof(unsigned), pFile);
-            delete[] header;
-            std::fclose(pFile);
-
-            pFile = std::fopen(name, "rb"); // check if file is save correctly with correct Page_size
-            std::fseek(pFile, 0, SEEK_END);
-            unsigned length = std::ftell(pFile);
-            if (length != PAGE_SIZE) {
-                return RC_FILE_SIZE_ERROR;
-            }
-            std::fclose(pFile);
-
+            createFileHelper(name);
             delete[] name;
             return SUCCESS;
         }
@@ -116,7 +119,7 @@ namespace PeterDB {
         tempPointer[1] = writePageCounter;
         tempPointer[2] = appendPageCounter;
         tempPointer[3] = numberOfPages;
-        for(int i = 4; i < PAGE_SIZE/sizeof(unsigned); i++){
+        for(int i = 4; i < PAGE_SIZE/UNSIGNEDSIZE; i++){
             tempPointer[i] = -1;
         }
     }
@@ -124,8 +127,8 @@ namespace PeterDB {
     void FileHandle::getHeader(){   // get header from the file's hidden page
         FILE* filePointer = std::fopen(savedFileName,"rb");
 
-        unsigned * header = new unsigned[PAGE_SIZE/sizeof(unsigned)];
-        std::fread(header, sizeof(unsigned),PAGE_SIZE/sizeof(unsigned),filePointer);
+        unsigned * header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
+        std::fread(header, UNSIGNEDSIZE,PAGE_SIZE/UNSIGNEDSIZE,filePointer);
         std::fclose(filePointer);
 
         readPageCounter = header[0]+1;
@@ -137,11 +140,11 @@ namespace PeterDB {
 
     RC FileHandle::saveHeader(){ // save the header to the file
         writePageCounter++;
-        unsigned * header = new unsigned[PAGE_SIZE/sizeof(unsigned)];
+        unsigned * header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
         configureHeader(header); // save the header with the current Counters
 
         FILE* filePointer = std::fopen(savedFileName,"rb+");
-        std::fwrite(header, sizeof(unsigned), PAGE_SIZE/sizeof(unsigned), filePointer);
+        std::fwrite(header, UNSIGNEDSIZE, PAGE_SIZE/UNSIGNEDSIZE, filePointer);
         std::fclose(filePointer);
 
         filesizecheck();
@@ -180,10 +183,11 @@ namespace PeterDB {
             return RC_FILE_SIZE_ERROR;
         }
 
-        FILE * filePointer = std::fopen(savedFileName, "rb");
+        FILE * filePointer = std::fopen(savedFileName, "r");
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fread(data, 1, PAGE_SIZE, filePointer); // read the data from start of page to next page
         std::fclose(filePointer);
+
         filesizecheck();
         if(temp != filesize) { // check if filesize have changed with the write move
             return RC_FILE_SIZE_ERROR;
@@ -235,6 +239,7 @@ namespace PeterDB {
 
         std::fwrite(data, 1, PAGE_SIZE, filePointer); // write a new data
         std::fclose(filePointer);
+
         filesizecheck();
         if(temp+PAGE_SIZE != filesize) { // check if file size have increased with factor of PAGE_SIZE
             return RC_FILE_SIZE_ERROR;

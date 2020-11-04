@@ -6,6 +6,10 @@
 
 #include "src/include/rbfm.h"
 
+#define RC_RM_CREATE_CATALOG_ERROR 7;
+#define RC_RM_DELETE_TABLE_ERROR 8;
+#define RC_COLUMN_READ_ERROR 9;
+
 namespace PeterDB {
 #define RM_EOF (-1)  // end of a scan operator
 
@@ -65,6 +69,24 @@ namespace PeterDB {
 
         RC dropAttribute(const std::string &tableName, const std::string &attributeName);
 
+        std::string table = "catalog_table";
+        std::string column = "catalog_column";
+        std::vector<Attribute> tableDescriptor;
+        std::vector<Attribute> columnDescriptor;
+
+        unsigned tableID = 0;
+
+        RC createTableDescriptor();
+        RC createColumnDescriptor();
+        RC emptyTableDescriptor();
+        RC emptyColumnDescriptor();
+        RC deleteAllTableFile();
+
+        unsigned char * createTableData(const std::string & tableName);
+        unsigned char * createAttributeData(Attribute attr, int position);
+
+        bool catalogCreated = false;
+
     protected:
         RelationManager();                                                  // Prevent construction
         ~RelationManager();                                                 // Prevent unwanted destruction
@@ -72,6 +94,8 @@ namespace PeterDB {
         RelationManager &operator=(const RelationManager &);                // Prevent assignment
 
     };
+
+    //RecordBasedFileManager &rbfm = RecordBasedFileManager::instance();
 
 } // namespace PeterDB
 

@@ -7,6 +7,17 @@
 
 #include "pfm.h"
 
+#define RC_RFBM_READ_NONEXISTING_DATA 6
+#define FREESPACE 1
+#define MAXNUMSLOT 2
+#define SLOTTOUSE 3
+#define LASTSLOTEDITED 4
+
+#define SHORTSIZE sizeof(unsigned short)
+#define INTSIZE sizeof(int)
+#define FLOATSIZE sizeof(float)
+
+
 namespace PeterDB {
     // Record ID
     typedef struct {
@@ -63,9 +74,37 @@ namespace PeterDB {
         // Never keep the results in the memory. When getNextRecord() is called,
         // a satisfying record needs to be fetched from the file.
         // "data" follows the same format as RecordBasedFileManager::insertRecord().
-        RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
+        RC getNextRecord(RID &rid, void *data);
 
-        RC close() { return -1; };
+        RC close();
+
+        RC open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp compOp, const void *value);
+
+        RC updatePageSlotNum();
+
+        bool checkPassTest(unsigned short &slotOffSet, unsigned short dataSize);
+
+        RC compareAttribute(void * record, unsigned short dataSize);
+
+        RC compareInteger(int integer);
+
+        RC compareFloat(float realNumber);
+
+        RC compareString(char * string, unsigned short number_of_char);
+
+        RC selectAttribute(void * record, void * data);
+
+        void * pageData;
+        FileHandle storedFileHandle;
+        unsigned short currentPageNum;
+        unsigned short currentSlotNum;
+        unsigned short maxSlotNum;
+        unsigned short maxPageNum;
+        const std::vector<Attribute> * AttributeDescriptor;
+        const std::vector<std::string> * scanAttr;
+        const std::string * conditionAttributeName;
+        CompOp comparisonOperation;
+        const void * comparisonValue;
     };
 
     class RecordBasedFileManager {
@@ -133,6 +172,18 @@ namespace PeterDB {
                 const void *value,                    // used in the comparison
                 const std::vector<std::string> &attributeNames, // a list of projected attributes
                 RBFM_ScanIterator &rbfm_ScanIterator);
+
+        unsigned getRecordLength(const std::vector<Attribute> &recordDescriptor, const void *data); // returns the length of the data to be inserted
+
+        unsigned findEmptyPage(FileHandle &fileHandle, unsigned offset, unsigned number_of_pages); // find Empty page in the slot directory
+
+        RC editSlotDirectory(void * page, unsigned short &slotNum, unsigned short &slotOffSet, unsigned short &offset);
+
+        RC writeAtFreeSpace(void * page, const void * data, unsigned short slotOffSet, unsigned short &offset);
+
+        RC shiftData(void * page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short &endOfData);
+
+        RC shiftSlot(void * page, unsigned short maxNumOfSlot, unsigned short slotOffset, unsigned short dataSize);
 
     protected:
         RecordBasedFileManager();                                                   // Prevent construction
