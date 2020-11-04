@@ -56,6 +56,8 @@ namespace PeterDB {
 
     RC RelationManager::createCatalog() {
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        std::remove(table.c_str());
+        std::remove(column.c_str());
         RC problem = recordBasedFileManager.createFile(table);
         problem += recordBasedFileManager.createFile(column);
         createTableDescriptor();
@@ -164,6 +166,7 @@ namespace PeterDB {
         if (!catalogCreated) {
             return RC_RM_CREATE_CATALOG_ERROR;
         }
+        std::remove(tableName.c_str());
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         RID rid;
@@ -237,6 +240,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::getAttributes(const std::string &tableName, std::vector<Attribute> &attrs) {
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
         attrs.erase(attrs.begin(), attrs.end());
 
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
@@ -326,6 +332,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::insertTuple(const std::string &tableName, const void *data, RID &rid) {
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         std::vector<Attribute> recordDescriptor;
@@ -338,6 +347,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::deleteTuple(const std::string &tableName, const RID &rid) {
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         std::vector<Attribute> recordDescriptor;
@@ -350,6 +362,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::updateTuple(const std::string &tableName, const void *data, const RID &rid) {
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         std::vector<Attribute> recordDescriptor;
@@ -362,6 +377,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::readTuple(const std::string &tableName, const RID &rid, void *data) {
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         std::vector<Attribute> recordDescriptor;
@@ -382,7 +400,18 @@ namespace PeterDB {
 
     RC RelationManager::readAttribute(const std::string &tableName, const RID &rid, const std::string &attributeName,
                                       void *data) {
-        return -1;
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        FileHandle fileHandle;
+        std::vector<Attribute> recordDescriptor;
+        RC problem = SUCCESS;
+        problem += getAttributes(tableName, recordDescriptor);
+        problem += recordBasedFileManager.openFile(tableName, fileHandle);
+        problem += recordBasedFileManager.readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
+        problem += recordBasedFileManager.closeFile(fileHandle);
+        return problem;
     }
 
     RC RelationManager::scan(const std::string &tableName,
@@ -391,16 +420,37 @@ namespace PeterDB {
                              const void *value,
                              const std::vector<std::string> &attributeNames,
                              RM_ScanIterator &rm_ScanIterator) {
-        return -1;
+        if (access(tableName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        FileHandle fileHandle;
+        std::vector<Attribute> recordDescriptor;
+        RC problem = SUCCESS;
+        problem += getAttributes(tableName, recordDescriptor);
+        recordBasedFileManager.openFile(tableName, fileHandle);
+        rm_ScanIterator.open(fileHandle, recordDescriptor, attributeNames, conditionAttribute, compOp, value);
+        return problem;
     }
 
     RM_ScanIterator::RM_ScanIterator() = default;
 
     RM_ScanIterator::~RM_ScanIterator() = default;
 
-    RC RM_ScanIterator::getNextTuple(RID &rid, void *data) { return RM_EOF; }
+    RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
+        return scanIterator.getNextRecord(rid, data);
+    }
 
-    RC RM_ScanIterator::close() { return -1; }
+    RC RM_ScanIterator::close() {
+        return scanIterator.close();
+    }
+
+    RC RM_ScanIterator::open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp comparisonOperation, const void * comparisonValue) {
+        for(int i = 0; i < recordDescriptor.size(); i++) {
+            storedDescriptor.push_back(recordDescriptor.at(i));
+        }
+        scanIterator.open(fileHandle, storedDescriptor, attributeName, conditionAttribute, comparisonOperation, comparisonValue);
+    }
 
     // Extra credit work
     RC RelationManager::dropAttribute(const std::string &tableName, const std::string &attributeName) {

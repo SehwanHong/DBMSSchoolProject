@@ -24,6 +24,11 @@ namespace PeterDB {
         RC getNextTuple(RID &rid, void *data);
 
         RC close();
+
+        RC open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp comparisonOperation, const void * comparisonValue);
+
+        RBFM_ScanIterator scanIterator;
+        std::vector<Attribute> storedDescriptor;
     };
 
     // Relation Manager

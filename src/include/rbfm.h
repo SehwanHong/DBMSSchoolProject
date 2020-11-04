@@ -8,6 +8,8 @@
 #include "pfm.h"
 
 #define RC_RFBM_READ_NONEXISTING_DATA 6
+#define RC_PAGE_SHIFT_ERROR 10;
+
 #define FREESPACE 1
 #define MAXNUMSLOT 2
 #define SLOTTOUSE 3
@@ -93,6 +95,8 @@ namespace PeterDB {
         RC compareString(char * string, unsigned short number_of_char);
 
         RC selectAttribute(void * record, void * data);
+
+        bool correctSlotOffSetDataSize(unsigned short slotOffSet, unsigned short dataSize);
 
         void * pageData;
         FileHandle storedFileHandle;

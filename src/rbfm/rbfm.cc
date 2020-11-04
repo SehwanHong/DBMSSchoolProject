@@ -128,7 +128,10 @@ namespace PeterDB {
             unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
             unsigned short endOfData = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
 
-            shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
+            RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1] = 0;
             pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum] = 0;
@@ -138,7 +141,10 @@ namespace PeterDB {
             }
 
             //shift Everything to the current.
-            shiftData(pageSlot, slotOffset, dataSize, endOfData);
+            problem = shiftData(pageSlot, slotOffset, dataSize, endOfData);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             //save the page
             fileHandle.writePage(rid.pageNum, pageSlot);
@@ -212,20 +218,30 @@ namespace PeterDB {
             pageSlot[PAGE_SIZE/SHORTSIZE - 1] += dataSize;
             pageSlot[PAGE_SIZE/SHORTSIZE - 1] -= offset;
 
-            shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             // save the data from the offset
             unsigned short index = slotOffset;
             writeAtFreeSpace(pageSlot, data, index, offset);
             index += offset;
             shiftData(pageSlot, index, dataSize - offset, endOfData);
+            problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             fileHandle.writePage(rid.pageNum,pageSlot);
             delete[] pageSlot;
             return SUCCESS;
         } else if (offset <= availableStorage + dataSize){
             // Change slot directory
-            shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
+            RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             unsigned position = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
             pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum] = position;
@@ -235,7 +251,10 @@ namespace PeterDB {
             pageSlot[PAGE_SIZE/SHORTSIZE - 1] -= offset;
 
             //Shift the data
-            shiftData(pageSlot, slotOffset, dataSize, endOfData);
+            problem = shiftData(pageSlot, slotOffset, dataSize, endOfData);
+            if (problem != SUCCESS) {
+                return problem;
+            }
             writeAtFreeSpace(pageSlot, data, position, offset);
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
@@ -288,20 +307,36 @@ namespace PeterDB {
         memcpy(null_indicator, (char*)record+offset, null_bytes);
         offset += null_bytes;
         for(int i = 0 ; i < length ; i++ ){
-            unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
-            nullBit = null_indicator[i/8] & mask;
             unsigned int number_of_char = 0;
+            unsigned char * readAttr = (unsigned char*) data;
+            unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
 
-            if (attributeName == recordDescriptor[i].name) {
-                unsigned char * readAttr = (unsigned char*) data;
-                if (nullBit) {
-                    readAttr[0] = 128;
-                } else {
-                    readAttr[0] = 0;
-                    recordDescriptor[i].type == AttrType::TypeVarChar ? number_of_char = recordDescriptor[i].length + 4 : number_of_char = recordDescriptor[i].length;
-                    memcpy(readAttr + 1, record + offset, number_of_char);
+            nullBit = null_indicator[i/8] & mask;
+            if (!nullBit){
+                switch (recordDescriptor[i].type) {
+                    case AttrType::TypeInt:
+                        if (attributeName == recordDescriptor[i].name) {
+                            readAttr[0] = 0;
+                            memcpy(readAttr + 1, record + offset, INTSIZE);
+                        }
+                        offset += INTSIZE; break;
+                    case AttrType::TypeReal:
+                        if (attributeName == recordDescriptor[i].name) {
+                            readAttr[0] = 0;
+                            memcpy(readAttr + 1, record + offset, FLOATSIZE);
+                        }
+                        offset += FLOATSIZE; break;
+                    case AttrType::TypeVarChar:
+                        unsigned int number_of_char =  *((unsigned int * )(record+offset));
+                        if (attributeName == recordDescriptor[i].name) {
+                            readAttr[0] = 0;
+                            memcpy(readAttr + 1, record + offset, number_of_char + INTSIZE);
+                        }
+                        offset += INTSIZE;
+                        offset += number_of_char;
                 }
-                break;
+            } else if (nullBit && attributeName == recordDescriptor[i].name) {
+                readAttr[0] = 128;
             }
         }
         delete[] record;
@@ -422,6 +457,9 @@ namespace PeterDB {
     }
 
     RC RecordBasedFileManager::shiftData(void *page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short &endOfData) {
+        if (slotOffSet >= 4088 || dataSize >= 4088 || endOfData >= 4088) {
+            return RC_PAGE_SHIFT_ERROR;
+        }
         unsigned char * pageData = (unsigned char * ) page;
         for(unsigned int i = slotOffSet; i < endOfData - dataSize; i++){
             pageData[i] = pageData[i+dataSize];
@@ -429,15 +467,20 @@ namespace PeterDB {
         for(unsigned int i = endOfData - dataSize; i < endOfData; i++) {
             pageData[i] = -1;
         }
+        return SUCCESS;
     }
 
     RC RecordBasedFileManager::shiftSlot(void *page, unsigned short maxNumOfSlot, unsigned short slotOffset, unsigned short dataSize) {
+        if (slotOffset >= 4088 || dataSize >= 4088 || maxNumOfSlot > 2044) {
+            return RC_PAGE_SHIFT_ERROR;
+        }
         unsigned short * pageSlot = (unsigned short *) page;
         for (int i = 0 ; i < maxNumOfSlot; i++){
             if(pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i] > slotOffset && pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i + 1] < 4088){
                 pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i] -= dataSize;
             }
         }
+        return SUCCESS;
     }
 
     RC RBFM_ScanIterator::open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp compOp, const void *value) {
@@ -457,6 +500,7 @@ namespace PeterDB {
 
     RC RBFM_ScanIterator::close() {
         delete[] (char*)pageData;
+        return SUCCESS;
     }
 
     RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
@@ -471,15 +515,13 @@ namespace PeterDB {
             slotOffSet = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum];
             dataSize = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum + 1];
 
-            if (slotOffSet >= 32768 && dataSize >= 32768) {
-                updatePageSlotNum();
+            while(!correctSlotOffSetDataSize(slotOffSet,dataSize)) {
+                result = updatePageSlotNum();
                 slotOffSet = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum];
                 dataSize = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum + 1];
-            } else if (slotOffSet == 0 && dataSize == 0) {
-                updatePageSlotNum();
-                slotOffSet = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum];
-                dataSize = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum + 1];
+                if (result == RBFM_EOF) break;
             }
+
             if (result == RBFM_EOF) {
                 return result;
             } else {
@@ -497,6 +539,14 @@ namespace PeterDB {
         rid.slotNum = currentSlotNum;
     };
 
+    bool RBFM_ScanIterator::correctSlotOffSetDataSize(unsigned short slotOffSet, unsigned short dataSize) {
+        if (slotOffSet >= 0 && slotOffSet <= 4088 && dataSize <= 4088 && dataSize > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     RC RBFM_ScanIterator::updatePageSlotNum() {
         unsigned short * slotDirectory = (unsigned short *)pageData;
         if(currentSlotNum == maxSlotNum && currentPageNum + 1 == maxPageNum) {
@@ -506,6 +556,8 @@ namespace PeterDB {
             maxSlotNum = slotDirectory[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT];
             currentPageNum += 1;
             storedFileHandle.readPage(currentPageNum, pageData);
+        } else if (maxPageNum == 0) {
+            return RBFM_EOF;
         } else {
             currentSlotNum += 1;
         }
@@ -532,11 +584,11 @@ namespace PeterDB {
         bool result = false;
         memcpy(null_indicator, temp+offset, nullBytes);
         offset += nullBytes;
-        for(int i = 0 ; i < dataSize ; i++ ){
+        for(int i = 0 ; i < numOfAttribute ; i++ ){
             unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
             nullBit = null_indicator[i/8] & mask;
             if (!nullBit){
-                if (AttributeDescriptor->at(i).name == *conditionAttributeName) {
+                if (comparisonOperation == NO_OP || AttributeDescriptor->at(i).name == *conditionAttributeName) {
                     unsigned int number_of_char = 0;
                     switch (AttributeDescriptor->at(i).type) {
                         case AttrType::TypeInt: {
