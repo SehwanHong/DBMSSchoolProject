@@ -1,4 +1,4 @@
-if("master" STREQUAL "")
+if("v0.4.0" STREQUAL "")
   message(FATAL_ERROR "Tag for git checkout should not be empty.")
 endif()
 
@@ -52,7 +52,7 @@ set(error_code 1)
 set(number_of_tries 0)
 while(error_code AND number_of_tries LESS 3)
   execute_process(
-    COMMAND "/usr/bin/git" ${git_options} clone ${git_clone_options} --origin "origin" "https://github.com/Yicong-Huang/glog.git" "googlelog"
+    COMMAND "/usr/bin/git" ${git_options} clone ${git_clone_options} --origin "origin" "https://github.com/google/glog.git" "googlelog"
     WORKING_DIRECTORY "/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/googlelog-prefix/src"
     RESULT_VARIABLE error_code
     )
@@ -63,16 +63,16 @@ if(number_of_tries GREATER 1)
           ${number_of_tries} times.")
 endif()
 if(error_code)
-  message(FATAL_ERROR "Failed to clone repository: 'https://github.com/Yicong-Huang/glog.git'")
+  message(FATAL_ERROR "Failed to clone repository: 'https://github.com/google/glog.git'")
 endif()
 
 execute_process(
-  COMMAND "/usr/bin/git" ${git_options} checkout master --
+  COMMAND "/usr/bin/git" ${git_options} checkout v0.4.0 --
   WORKING_DIRECTORY "/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/googlelog-prefix/src/googlelog"
   RESULT_VARIABLE error_code
   )
 if(error_code)
-  message(FATAL_ERROR "Failed to checkout tag: 'master'")
+  message(FATAL_ERROR "Failed to checkout tag: 'v0.4.0'")
 endif()
 
 execute_process(

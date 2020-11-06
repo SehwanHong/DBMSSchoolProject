@@ -112,9 +112,6 @@
 /* Define to 1 if you have the <sys/utsname.h> header file. */
 #define HAVE_SYS_UTSNAME_H
 
-/* Define to 1 if you have the <sys/wait.h> header file. */
-#define HAVE_SYS_WAIT_H
-
 /* Define to 1 if you have the <ucontext.h> header file. */
 #define HAVE_UCONTEXT_H
 
@@ -122,7 +119,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Define to 1 if you have the <unwind.h> header file. */
-/* #undef HAVE_UNWIND_H */
+#define HAVE_UNWIND_H 1
 
 /* define if the compiler supports using expression for operator */
 #define HAVE_USING_OPERATOR
@@ -170,7 +167,7 @@
 /* How to access the PC from a struct ucontext */
 /* #undef PC_FROM_UCONTEXT */
 
-/* define if we should print file offsets in traces instead of symbolizing. */
+/* define if we should print raw pc values on symbolization failure. */
 /* #undef PRINT_UNSYMBOLIZED_STACK_TRACES */
 
 /* Define to necessary symbol if this constant uses a non-standard name on

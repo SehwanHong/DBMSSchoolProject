@@ -19,9 +19,7 @@ endmacro()
 ####################################################################################
 
 include (CMakeFindDependencyMacro)
-include (${CMAKE_CURRENT_LIST_DIR}/glog-modules.cmake)
 
 
 
-
-include (${CMAKE_CURRENT_LIST_DIR}/glog-targets.cmake)
+include ("${CMAKE_CURRENT_LIST_DIR}/glog-targets.cmake")
