@@ -512,6 +512,8 @@ namespace PeterDBTesting {
 
         int numRecords = 160000;
         int batchSize = 5000;
+        //int numRecords = 16000;
+        //int batchSize = 500;
         std::vector<PeterDB::RID> rids;
 
         std::vector<PeterDB::Attribute> recordDescriptorForTwitterUser;
@@ -547,6 +549,7 @@ namespace PeterDBTesting {
         // 1. Read 160000 records from File
 
         int numRecords = 160000;
+        //int numRecords = 16000;
         inBuffer = malloc(1000);
         outBuffer = malloc(1000);
         memset(inBuffer, 0, 1000);

@@ -104,6 +104,7 @@ namespace PeterDB {
         savedFileName  = new char[len+1];
         std::copy(fileName.begin(), fileName.end(), savedFileName);
         savedFileName[len] = '\0';
+        filePointer = std::fopen(savedFileName, "rb+");
         getHeader();
         filesizecheck();
         unsigned temp = filesize;
@@ -125,12 +126,12 @@ namespace PeterDB {
     }
 
     void FileHandle::getHeader(){   // get header from the file's hidden page
-        FILE* filePointer = std::fopen(savedFileName,"rb");
-
         unsigned * header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
-        std::fread(header, UNSIGNEDSIZE,PAGE_SIZE/UNSIGNEDSIZE,filePointer);
-        std::fclose(filePointer);
 
+        std::fseek(filePointer, 0L, SEEK_SET);
+        std::fread(header, UNSIGNEDSIZE,PAGE_SIZE/UNSIGNEDSIZE,filePointer);
+
+        std::fseek(filePointer, 0L, SEEK_SET);
         readPageCounter = header[0]+1;
         writePageCounter = header[1];
         appendPageCounter = header[2];
@@ -143,30 +144,30 @@ namespace PeterDB {
         unsigned * header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
         configureHeader(header); // save the header with the current Counters
 
-        FILE* filePointer = std::fopen(savedFileName,"rb+");
+        std::fseek(filePointer, 0L, SEEK_SET);
         std::fwrite(header, UNSIGNEDSIZE, PAGE_SIZE/UNSIGNEDSIZE, filePointer);
-        std::fclose(filePointer);
+        delete[] header;
 
         filesizecheck();
         unsigned temp = filesize;
         if (temp != (numberOfPages+1)*PAGE_SIZE){  // check if the file size have changed
             return RC_FILE_SIZE_ERROR;
         }
-        delete[] header;
+        return SUCCESS;
     }
 
     RC FileHandle::closeFile() {
         saveHeader();
+        std::fclose(filePointer);
         delete[] savedFileName;
         savedFileName = NULL;
         return SUCCESS;
     }
 
     unsigned FileHandle::filesizecheck() { // check the size of the file
-        FILE* filePointer = std::fopen(savedFileName, "rb");
         std::fseek(filePointer, 0L, SEEK_END);
         filesize = std::ftell(filePointer);
-        std::fclose(filePointer);
+        std::fseek(filePointer, 0L, SEEK_SET);
     }
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
@@ -183,10 +184,10 @@ namespace PeterDB {
             return RC_FILE_SIZE_ERROR;
         }
 
-        FILE * filePointer = std::fopen(savedFileName, "r");
+
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fread(data, 1, PAGE_SIZE, filePointer); // read the data from start of page to next page
-        std::fclose(filePointer);
+        std::fseek(filePointer, 0L, SEEK_SET);
 
         filesizecheck();
         if(temp != filesize) { // check if filesize have changed with the write move
@@ -211,10 +212,10 @@ namespace PeterDB {
             return RC_FILE_SIZE_ERROR;
         }
 
-        FILE * filePointer = std::fopen(savedFileName, "rb+");
+
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fwrite(data, 1, PAGE_SIZE, filePointer); //overwrite data
-        std::fclose(filePointer);
+        std::fseek(filePointer, 0L, SEEK_SET);
 
         filesizecheck();
         if(temp != filesize) {
@@ -235,10 +236,9 @@ namespace PeterDB {
         }
         numberOfPages++;
 
-        FILE * filePointer = std::fopen(savedFileName, "ab"); // append at the end of the file.
-
+        std::fseek(filePointer, 0L, SEEK_END);
         std::fwrite(data, 1, PAGE_SIZE, filePointer); // write a new data
-        std::fclose(filePointer);
+        std::fseek(filePointer, 0L, SEEK_SET);
 
         filesizecheck();
         if(temp+PAGE_SIZE != filesize) { // check if file size have increased with factor of PAGE_SIZE

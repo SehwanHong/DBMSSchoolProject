@@ -25,10 +25,13 @@ namespace PeterDB {
 
         RC close();
 
+        RC open(bool wrongOpen);
+
         RC open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp comparisonOperation, const void * comparisonValue);
 
         RBFM_ScanIterator scanIterator;
         std::vector<Attribute> storedDescriptor;
+        bool failsOpen = true;
     };
 
     // Relation Manager
@@ -78,14 +81,22 @@ namespace PeterDB {
         std::string column = "catalog_column";
         std::vector<Attribute> tableDescriptor;
         std::vector<Attribute> columnDescriptor;
+        FileHandle tableFileHandle;
+        FileHandle columnFileHandle;
+        std::vector<FileHandle> tableFileCollection;
 
         unsigned tableID = 0;
+        std::string previousTableName;
+        std::vector<Attribute> previousRecordDescriptor;
+        unsigned previousTableID = 0;
 
         RC createTableDescriptor();
         RC createColumnDescriptor();
         RC emptyTableDescriptor();
         RC emptyColumnDescriptor();
         RC deleteAllTableFile();
+
+        unsigned getTableID(const std::string &tableName);
 
         unsigned char * createTableData(const std::string & tableName);
         unsigned char * createAttributeData(Attribute attr, int position);

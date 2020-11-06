@@ -59,7 +59,9 @@ namespace PeterDB {
         std::remove(table.c_str());
         std::remove(column.c_str());
         RC problem = recordBasedFileManager.createFile(table);
+        recordBasedFileManager.openFile(table, tableFileHandle);
         problem += recordBasedFileManager.createFile(column);
+        recordBasedFileManager.openFile(column,columnFileHandle);
         createTableDescriptor();
         createColumnDescriptor();
         catalogCreated = true;
@@ -116,6 +118,9 @@ namespace PeterDB {
         RC problem = deleteAllTableFile();
         emptyTableDescriptor();
         emptyColumnDescriptor();
+        delete[] tableFileHandle.savedFileName;
+        delete[] columnFileHandle.savedFileName;
+        tableFileCollection.erase(tableFileCollection.begin(),tableFileCollection.end());
         problem += recordBasedFileManager.destroyFile(table);
         problem += recordBasedFileManager.destroyFile(column);
         return problem;
@@ -168,111 +173,92 @@ namespace PeterDB {
         }
         std::remove(tableName.c_str());
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
         RID rid;
         RC problem = SUCCESS;
         tableID += 1;
         unsigned char * tableData = createTableData(tableName);
-        problem += recordBasedFileManager.openFile(table, fileHandle);
-        problem += recordBasedFileManager.insertRecord(fileHandle, tableDescriptor, tableData, rid);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        problem += recordBasedFileManager.insertRecord(tableFileHandle, tableDescriptor, tableData, rid);
         delete[] tableData;
 
         int position;
-        problem += recordBasedFileManager.openFile(column, fileHandle);
 
         for(position = 0; position < attrs.size() ; position++) {
             unsigned char * columnData = createAttributeData(attrs[position], position);
-            problem += recordBasedFileManager.insertRecord(fileHandle, columnDescriptor, columnData, rid);
+            problem += recordBasedFileManager.insertRecord(columnFileHandle, columnDescriptor, columnData, rid);
             delete[] columnData;
         }
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        previousTableName = tableName;
+        previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+        previousRecordDescriptor.insert(previousRecordDescriptor.begin(), attrs.begin(), attrs.end());
+        previousTableID = tableID;
 
         problem += recordBasedFileManager.createFile(tableName);
+        FileHandle fileHandle;
+        problem += recordBasedFileManager.openFile(tableName, fileHandle);
+        tableFileCollection.push_back(fileHandle);
+
         return problem;
     }
 
     RC RelationManager::deleteTable(const std::string &tableName) {
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        RC problem = recordBasedFileManager.openFile(table, fileHandle);
         std::vector<std::string> projectedAttribute = {"table-id"};
         std::vector<RID> rids;
-        int * table_id = new int;
+        int table_id = getTableID(tableName);
         RBFM_ScanIterator rbfmScanIterator;
-        problem += recordBasedFileManager.scan(fileHandle, tableDescriptor, "table-name", EQ_OP, tableName.c_str(), projectedAttribute, rbfmScanIterator);
-        RID temp;
-        char* temporary_saving = new char[5];
-        while(rbfmScanIterator.getNextRecord(temp, temporary_saving) != RBFM_EOF) {
-            int * temporary_table_id;
-            rids.push_back(temp);
-            memcpy(table_id,temporary_saving + 1,4);
-        }
-        if (rids.size() == 0) {
-            return RC_FILE_NAME_NOT_EXIST;
-        } else if (rids.size() == 1) {
-            problem += recordBasedFileManager.deleteRecord(fileHandle, tableDescriptor, rids[0]);
-            problem += recordBasedFileManager.closeFile(fileHandle);
-        } else {
+        RC problem = SUCCESS;
+        char * temporary_saving = new char[5];
+        if (table_id == 0) {
             return RC_RM_DELETE_TABLE_ERROR;
         }
 
         rids.erase(rids.begin(), rids.end());
 
-        problem += recordBasedFileManager.openFile(column, fileHandle);
-
-        recordBasedFileManager.scan(fileHandle, columnDescriptor, "table-id", EQ_OP, table_id, projectedAttribute, rbfmScanIterator);
+        recordBasedFileManager.scan(columnFileHandle, columnDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
         RID column;
         while(rbfmScanIterator.getNextRecord(column, temporary_saving) != RBFM_EOF) {
             rids.push_back(column);
         }
 
         for(int i = 0; i < rids.size(); i++) {
-            problem += recordBasedFileManager.deleteRecord(fileHandle, columnDescriptor, rids[i]);
+            problem += recordBasedFileManager.deleteRecord(columnFileHandle, columnDescriptor, rids[i]);
         }
-        problem += recordBasedFileManager.closeFile(fileHandle);
+
+        delete[] tableFileCollection.at(table_id-1).savedFileName;
 
         delete[] temporary_saving;
-        delete table_id;
 
         problem += recordBasedFileManager.destroyFile(tableName);
+        if (previousTableName == tableName) {
+            previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+            previousTableName = "";
+            previousTableID = 0;
+        }
         return problem;
     }
 
     RC RelationManager::getAttributes(const std::string &tableName, std::vector<Attribute> &attrs) {
+        if (previousTableName == tableName) {
+            attrs.erase(attrs.begin(), attrs.end());
+            attrs.insert(attrs.begin(), previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+            return SUCCESS;
+        }
         if (access(tableName.c_str(), F_OK) != 0) {
             return RC_FILE_NAME_NOT_EXIST;
         }
         attrs.erase(attrs.begin(), attrs.end());
 
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        RC problem = recordBasedFileManager.openFile(table, fileHandle);
         std::vector<std::string> projectedAttribute = {"table-id"};
         std::vector<RID> rids;
-        int * table_id = new int;
+        int table_id = getTableID(tableName);
         RBFM_ScanIterator rbfmScanIterator;
-        problem += recordBasedFileManager.scan(fileHandle, tableDescriptor, "table-name", EQ_OP, tableName.c_str(), projectedAttribute, rbfmScanIterator);
-        RID temp;
-        char* temporary_saving = new char[5];
-        while(rbfmScanIterator.getNextRecord(temp, temporary_saving) != RBFM_EOF) {
-            int * temporary_table_id;
-            rids.push_back(temp);
-            memcpy(table_id,temporary_saving + 1,4);
-        }
-        if (rids.size() == 0) {
-            return RC_FILE_NAME_NOT_EXIST;
-        } else if (rids.size() == 1) {
-            problem += recordBasedFileManager.closeFile(fileHandle);
-        } else {
-            return RC_RM_DELETE_TABLE_ERROR;
-        }
+        char * temporary_saving = new char[5];
+        RC problem = SUCCESS;
 
         rids.erase(rids.begin(), rids.end());
 
-        problem += recordBasedFileManager.openFile(column, fileHandle);
-
-        recordBasedFileManager.scan(fileHandle, columnDescriptor, "table-id", EQ_OP, table_id, projectedAttribute, rbfmScanIterator);
+        recordBasedFileManager.scan(columnFileHandle, columnDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
         RID column;
         while(rbfmScanIterator.getNextRecord(column, temporary_saving) != RBFM_EOF) {
             rids.push_back(column);
@@ -285,7 +271,7 @@ namespace PeterDB {
 
         for(int i = 0; i < rids.size(); i++) {
             char * record = new char[maxPossibleLength];
-            problem += recordBasedFileManager.readRecord(fileHandle, columnDescriptor, rids[i], record);
+            problem += recordBasedFileManager.readRecord(tableFileCollection.at(table_id-1), columnDescriptor, rids[i], record);
 
             unsigned int columnDescriptorLength = columnDescriptor.size();
             unsigned int nullBytes = columnDescriptorLength / 8 + (columnDescriptorLength % 8 == 0 ? 0 : 1);\
@@ -314,6 +300,7 @@ namespace PeterDB {
                     attrs[columnPosition].type = AttrType::TypeVarChar;
                     break;
                 default:
+                    delete[] record;
                     return RC_COLUMN_READ_ERROR;
             }
             attrs[columnPosition].length = columnLength;
@@ -324,11 +311,33 @@ namespace PeterDB {
             delete[] record;
             delete[] nameString;
         }
-        problem += recordBasedFileManager.closeFile(fileHandle);
 
         delete[] temporary_saving;
-        delete table_id;
         return problem;
+    }
+
+    unsigned RelationManager::getTableID(const std::string &tableName) {
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        std::vector<std::string> projectedAttribute = {"table-id"};
+        std::vector<RID> rids;
+        int table_id = 0;
+        RBFM_ScanIterator rbfmScanIterator;
+        RC problem = recordBasedFileManager.scan(tableFileHandle, tableDescriptor, "table-name", EQ_OP, tableName.c_str(), projectedAttribute, rbfmScanIterator);
+        RID temp;
+        char* temporary_saving = new char[5];
+        while(rbfmScanIterator.getNextRecord(temp, temporary_saving) != RBFM_EOF) {
+            rids.push_back(temp);
+            table_id = *((int*)(temporary_saving + 1));
+        }
+        if (rids.size() == 0) {
+            delete[] temporary_saving;
+        } else if (rids.size() == 1) {
+            problem += SUCCESS;
+        } else {
+            delete[] temporary_saving;
+        }
+
+        return table_id;
     }
 
     RC RelationManager::insertTuple(const std::string &tableName, const void *data, RID &rid) {
@@ -337,12 +346,13 @@ namespace PeterDB {
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        problem += recordBasedFileManager.insertRecord(fileHandle, recordDescriptor, data, rid);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        if (previousTableName != tableName || previousRecordDescriptor.size() == 0) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        problem += recordBasedFileManager.insertRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, data, rid);
         return problem;
     }
 
@@ -351,13 +361,13 @@ namespace PeterDB {
             return RC_FILE_NAME_NOT_EXIST;
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        problem += recordBasedFileManager.deleteRecord(fileHandle, recordDescriptor, rid);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        if (previousTableName != tableName) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        problem += recordBasedFileManager.deleteRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid);
         return problem;
     }
 
@@ -366,13 +376,13 @@ namespace PeterDB {
             return RC_FILE_NAME_NOT_EXIST;
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        problem += recordBasedFileManager.updateRecord(fileHandle, recordDescriptor, data, rid);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        if (previousTableName != tableName) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        problem += recordBasedFileManager.updateRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, data, rid);
         return problem;
     }
 
@@ -381,13 +391,13 @@ namespace PeterDB {
             return RC_FILE_NAME_NOT_EXIST;
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        problem += recordBasedFileManager.readRecord(fileHandle, recordDescriptor, rid, data);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        if (previousTableName != tableName) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        problem += recordBasedFileManager.readRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid, data);
         return problem;
     }
 
@@ -404,13 +414,13 @@ namespace PeterDB {
             return RC_FILE_NAME_NOT_EXIST;
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        problem += recordBasedFileManager.readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
-        problem += recordBasedFileManager.closeFile(fileHandle);
+        if (previousTableName != tableName) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        problem += recordBasedFileManager.readAttribute(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid, attributeName, data);
         return problem;
     }
 
@@ -421,15 +431,17 @@ namespace PeterDB {
                              const std::vector<std::string> &attributeNames,
                              RM_ScanIterator &rm_ScanIterator) {
         if (access(tableName.c_str(), F_OK) != 0) {
+            rm_ScanIterator.open(true);
             return RC_FILE_NAME_NOT_EXIST;
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
-        FileHandle fileHandle;
-        std::vector<Attribute> recordDescriptor;
         RC problem = SUCCESS;
-        problem += getAttributes(tableName, recordDescriptor);
-        recordBasedFileManager.openFile(tableName, fileHandle);
-        rm_ScanIterator.open(fileHandle, recordDescriptor, attributeNames, conditionAttribute, compOp, value);
+        if (previousTableName != tableName) {
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+        }
+        rm_ScanIterator.open(tableFileCollection[previousTableID-1], previousRecordDescriptor, attributeNames, conditionAttribute, compOp, value);
         return problem;
     }
 
@@ -442,7 +454,15 @@ namespace PeterDB {
     }
 
     RC RM_ScanIterator::close() {
-        return scanIterator.close();
+        if (failsOpen) {
+            return SUCCESS;
+        } else {
+            return scanIterator.close();
+        }
+    }
+
+    RC RM_ScanIterator::open(bool wrongOpen) {
+        failsOpen = wrongOpen;
     }
 
     RC RM_ScanIterator::open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp comparisonOperation, const void * comparisonValue) {
@@ -450,6 +470,7 @@ namespace PeterDB {
             storedDescriptor.push_back(recordDescriptor.at(i));
         }
         scanIterator.open(fileHandle, storedDescriptor, attributeName, conditionAttribute, comparisonOperation, comparisonValue);
+        failsOpen = false;
     }
 
     // Extra credit work

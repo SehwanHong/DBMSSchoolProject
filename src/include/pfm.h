@@ -71,6 +71,7 @@ namespace PeterDB {
                                 unsigned &appendPageCount);                 // Put current counter values into variables
 
         char * savedFileName;                                               // Pointer to the file
+        FILE * filePointer;
     };
 
 } // namespace PeterDB

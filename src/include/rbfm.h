@@ -98,12 +98,12 @@ namespace PeterDB {
 
         bool correctSlotOffSetDataSize(unsigned short slotOffSet, unsigned short dataSize);
 
-        void * pageData;
+        void * pageData = NULL;
         FileHandle storedFileHandle;
-        unsigned short currentPageNum;
-        unsigned short currentSlotNum;
-        unsigned short maxSlotNum;
-        unsigned short maxPageNum;
+        unsigned short currentPageNum = 0;
+        unsigned short currentSlotNum = 0;
+        unsigned short maxSlotNum = 0;
+        unsigned short maxPageNum = 0;
         const std::vector<Attribute> * AttributeDescriptor;
         const std::vector<std::string> * scanAttr;
         const std::string * conditionAttributeName;
@@ -185,9 +185,10 @@ namespace PeterDB {
 
         RC writeAtFreeSpace(void * page, const void * data, unsigned short slotOffSet, unsigned short &offset);
 
-        RC shiftData(void * page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short &endOfData);
+        RC shiftData(void * page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short endOfData);
 
         RC shiftSlot(void * page, unsigned short maxNumOfSlot, unsigned short slotOffset, unsigned short dataSize);
+
 
     protected:
         RecordBasedFileManager();                                                   // Prevent construction

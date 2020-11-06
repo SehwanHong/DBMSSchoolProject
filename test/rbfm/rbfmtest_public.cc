@@ -152,7 +152,7 @@ namespace PeterDBTesting {
         outBuffer = malloc(1000);
 
         for (int i = 0; i < numRecords; i++) {
-            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
+            //if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
 
             memset(inBuffer, 0, 1000);
             memset(outBuffer, 0, 1000);
@@ -208,7 +208,7 @@ namespace PeterDBTesting {
 
         // Insert 10000 records into file
         for (int i = 0; i < numRecords; i++) {
-            if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
+            //if (i % 100 == 0) GTEST_LOG_(INFO) << " number of records is " << i;
 
             // Test insert Record
             int size = 0;

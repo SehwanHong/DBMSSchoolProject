@@ -50,7 +50,9 @@ namespace PeterDB {
         unsigned short slotNum;
         unsigned short slotOffset;
 
+        unsigned lastSlotInserted = ((unsigned short*)pageData)[PAGE_SIZE/SHORTSIZE - 4];
         editSlotDirectory(pageData, slotNum, slotOffset, offset);
+
 
         // edit the page
         writeAtFreeSpace(pageData, data, slotOffset, offset);
@@ -130,6 +132,7 @@ namespace PeterDB {
 
             RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
             if (problem != SUCCESS) {
+                delete[] pageSlot;
                 return problem;
             }
 
@@ -141,8 +144,14 @@ namespace PeterDB {
             }
 
             //shift Everything to the current.
+            if (endOfData != 4096 - availableStorage - 4 * maxNumOfSlot - 2*4) {
+                fileHandle.writePage(rid.pageNum, pageSlot);
+                delete[] pageSlot;
+                return RC_PAGE_SHIFT_ERROR;
+            }
             problem = shiftData(pageSlot, slotOffset, dataSize, endOfData);
             if (problem != SUCCESS) {
+                delete[] pageSlot;
                 return problem;
             }
 
@@ -195,8 +204,6 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const void *data, const RID &rid) {
-        unsigned number_of_pages = fileHandle.getNumberOfPages();
-
         unsigned short offset = getRecordLength(recordDescriptor, data);
 
         // check for size of data and where the data is located
@@ -208,18 +215,36 @@ namespace PeterDB {
         unsigned maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
         unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
         unsigned short endOfData = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+        bool inPage = true;
 
+        if (slotOffset >= 32768 && dataSize > 32768) {
+            unsigned newPageNum = 65536 - slotOffset;
+            unsigned newSlotNum = 65536 - dataSize;
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum] = 0;
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1] = 0;
+            pageSlot[PAGE_SIZE/SHORTSIZE - 3] = rid.slotNum;
+            fileHandle.writePage(rid.pageNum, pageSlot);
 
+            dataSize = 0;
+            inPage = false;
+            RID newRid;
+            newRid.pageNum = newPageNum;
+            newRid.slotNum = newSlotNum;
+            deleteRecord(fileHandle, recordDescriptor, newRid);
+        }
         if (offset <= dataSize) {
             // if the data updating is smaller than saved data
             // update the slot directory
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1] = offset;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4] = rid.slotNum;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 1] += dataSize;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 1] -= offset;
+            pageSlot[PAGE_SIZE / SHORTSIZE - 4 - 2 * rid.slotNum + 1] = offset;
+            pageSlot[PAGE_SIZE / SHORTSIZE - 1] += dataSize;
+            pageSlot[PAGE_SIZE / SHORTSIZE - 1] -= offset;
 
-            RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            RC problem = SUCCESS;
+            if (inPage) {
+                problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            }
             if (problem != SUCCESS) {
+                delete[] pageSlot;
                 return problem;
             }
 
@@ -227,59 +252,58 @@ namespace PeterDB {
             unsigned short index = slotOffset;
             writeAtFreeSpace(pageSlot, data, index, offset);
             index += offset;
-            shiftData(pageSlot, index, dataSize - offset, endOfData);
-            problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize - offset);
+            //shift Everything to the current.
+
+            if (inPage) {
+                problem = shiftData(pageSlot, index, dataSize - offset, (4088 - 4 * maxNumOfSlot));
+            }
             if (problem != SUCCESS) {
+                delete[] pageSlot;
                 return problem;
             }
 
-            fileHandle.writePage(rid.pageNum,pageSlot);
-            delete[] pageSlot;
-            return SUCCESS;
-        } else if (offset <= availableStorage + dataSize){
-            // Change slot directory
-            RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
-            if (problem != SUCCESS) {
-                return problem;
-            }
-
-            unsigned position = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum] = position;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1] = offset;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4] = rid.slotNum;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 1] += dataSize;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 1] -= offset;
-
-            //Shift the data
-            problem = shiftData(pageSlot, slotOffset, dataSize, endOfData);
-            if (problem != SUCCESS) {
-                return problem;
-            }
-            writeAtFreeSpace(pageSlot, data, position, offset);
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
+            return SUCCESS;
+        } else if (offset <= availableStorage + dataSize) {
+            delete[] pageSlot;
+            deleteRecord(fileHandle, recordDescriptor, rid);
+
+            pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
+            fileHandle.readPage(rid.pageNum, pageSlot);
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum] = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum + 1] = offset;
+            writeAtFreeSpace(pageSlot, data, pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum], offset);
+            fileHandle.writePage(rid.pageNum, pageSlot);
+            delete[] pageSlot;
+            return SUCCESS;
         } else {
             // find the page that have free space
-            unsigned newPageNum = findEmptyPage(fileHandle, offset, number_of_pages);
+            delete[] pageSlot;
 
-            unsigned short * newPageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
-            fileHandle.readPage(newPageNum, newPageSlot);
+            RID newrid;
+            insertRecord(fileHandle, recordDescriptor, data, newrid);
 
-            unsigned short newSlotNum = 0;
-            unsigned short newEndOfData = 0;
-            editSlotDirectory(newPageSlot, newSlotNum, newEndOfData, offset);
-            writeAtFreeSpace(newPageSlot, data, newEndOfData, offset);
-
-            fileHandle.writePage(newPageNum, newPageSlot);
-            delete[] newPageSlot;
+            pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
+            fileHandle.readPage(rid.pageNum, pageSlot);
 
             // Change slot directory
-            shiftSlot(pageSlot,maxNumOfSlot,slotOffset,dataSize);
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum] = 65535 - newPageNum + 1;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1] = 65535 - newSlotNum + 1;
-            pageSlot[PAGE_SIZE/SHORTSIZE - 1] += dataSize;
+            RC problem = SUCCESS;
+            if (inPage) {
+                problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
+            }
+            if (problem != SUCCESS) {
+                delete[] pageSlot;
+                return problem;
+            }
+            pageSlot[PAGE_SIZE / SHORTSIZE - 4 - 2 * rid.slotNum] = 65535 - newrid.pageNum + 1;
+            pageSlot[PAGE_SIZE / SHORTSIZE - 4 - 2 * rid.slotNum + 1] = 65535 - newrid.slotNum + 1;
+            pageSlot[PAGE_SIZE / SHORTSIZE - 1] += dataSize;
 
-            shiftData(pageSlot, slotOffset, dataSize, endOfData);
+
+            if (inPage) {
+                problem = shiftData(pageSlot, slotOffset, dataSize, (unsigned short)(4088 - 4 * maxNumOfSlot));
+            }
             //save the page
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
@@ -391,7 +415,8 @@ namespace PeterDB {
         for(pageNum = 0; pageNum < number_of_pages; pageNum++) {
             unsigned short* page = new unsigned short[PAGE_SIZE/SHORTSIZE];
             fileHandle.readPage(pageNum, page);
-            if (page[PAGE_SIZE/SHORTSIZE-1] >= offset + 4){ // added 8 bytes for slot offset and length
+            if (page[PAGE_SIZE/SHORTSIZE - FREESPACE] >= (offset + 4)){ // added 8 bytes for slot offset and length
+                unsigned availableBytes = page[PAGE_SIZE/SHORTSIZE - FREESPACE];
                 delete[] page;
                 break;
             } else {
@@ -456,8 +481,8 @@ namespace PeterDB {
         memcpy(pageData+slotOffSet, data, offset);
     }
 
-    RC RecordBasedFileManager::shiftData(void *page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short &endOfData) {
-        if (slotOffSet >= 4088 || dataSize >= 4088 || endOfData >= 4088) {
+    RC RecordBasedFileManager::shiftData(void *page, unsigned short &slotOffSet, unsigned short dataSize, unsigned short endOfData) {
+        if (slotOffSet >= 4088 || dataSize >= 4088 || endOfData >= 4088 || endOfData < dataSize) {
             return RC_PAGE_SHIFT_ERROR;
         }
         unsigned char * pageData = (unsigned char * ) page;
@@ -500,6 +525,7 @@ namespace PeterDB {
 
     RC RBFM_ScanIterator::close() {
         delete[] (char*)pageData;
+        storedFileHandle.closeFile();
         return SUCCESS;
     }
 
@@ -549,15 +575,13 @@ namespace PeterDB {
 
     RC RBFM_ScanIterator::updatePageSlotNum() {
         unsigned short * slotDirectory = (unsigned short *)pageData;
-        if(currentSlotNum == maxSlotNum && currentPageNum + 1 == maxPageNum) {
+        if((currentSlotNum == maxSlotNum && currentPageNum + 1 == maxPageNum) || maxPageNum == 0) {
             return RBFM_EOF;
         } else if (currentSlotNum >= maxSlotNum) {
             currentSlotNum = 1;
             maxSlotNum = slotDirectory[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT];
             currentPageNum += 1;
             storedFileHandle.readPage(currentPageNum, pageData);
-        } else if (maxPageNum == 0) {
-            return RBFM_EOF;
         } else {
             currentSlotNum += 1;
         }
