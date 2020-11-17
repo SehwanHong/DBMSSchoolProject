@@ -12,7 +12,8 @@ namespace PeterDB {
     }
 
     RC IndexManager::destroyFile(const std::string &fileName) {
-        return -1;
+        PagedFileManager &pfm = PagedFileManager::instance();
+        return pfm.destroyFile(fileName);
     }
 
     RC IndexManager::openFile(const std::string &fileName, IXFileHandle &ixFileHandle) {
