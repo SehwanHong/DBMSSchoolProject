@@ -77,8 +77,8 @@ namespace PeterDB {
 
         RC dropAttribute(const std::string &tableName, const std::string &attributeName);
 
-        std::string table = "catalog_table";
-        std::string column = "catalog_column";
+        std::string table = "Tables";
+        std::string column = "Columns";
         std::vector<Attribute> tableDescriptor;
         std::vector<Attribute> columnDescriptor;
         FileHandle tableFileHandle;
@@ -95,11 +95,14 @@ namespace PeterDB {
         RC emptyTableDescriptor();
         RC emptyColumnDescriptor();
         RC deleteAllTableFile();
+        RC createTableCatalog();
+        RC createColumnCatalog();
 
         unsigned getTableID(const std::string &tableName);
 
         unsigned char * createTableData(const std::string & tableName);
         unsigned char * createAttributeData(Attribute attr, int position);
+        unsigned char * createAttributeDataNoTableID(Attribute attr, int position);
 
         bool catalogCreated = false;
 
