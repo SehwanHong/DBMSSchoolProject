@@ -54,6 +54,67 @@ namespace PeterDB {
         columnDescriptor.push_back(attr);
     }
 
+    RC RelationManager::createTableCatalog() {
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        unsigned short tableAttributeLength = tableDescriptor.size();
+        unsigned short nullBytes = tableAttributeLength / 8 + (tableAttributeLength % 8 == 0 ? 0 : 1);
+        unsigned int tableNameSize = table.size();
+        unsigned short expectedLength = nullBytes + INTSIZE + tableNameSize + INTSIZE + tableNameSize;
+        unsigned char * tableData = new unsigned char[expectedLength];
+
+        const char * tableNameCstring = table.c_str();
+
+        unsigned char null_indicator = 128;
+        memcpy(tableData, &null_indicator, nullBytes);
+        memcpy(tableData + nullBytes, &tableNameSize, INTSIZE);
+        memcpy(tableData + nullBytes + INTSIZE, tableNameCstring, tableNameSize);
+        memcpy(tableData + nullBytes + INTSIZE + tableNameSize, &tableNameSize, INTSIZE);
+        memcpy(tableData + nullBytes + INTSIZE + tableNameSize + INTSIZE, tableNameCstring, tableNameSize);
+        RID temp;
+        recordBasedFileManager.insertRecord(tableFileHandle, tableDescriptor, tableData, temp);
+
+        delete[] tableData;
+
+        tableNameSize = column.size();
+        expectedLength = nullBytes + INTSIZE + tableNameSize + INTSIZE + tableNameSize;
+        tableData = new unsigned char[expectedLength];
+
+        tableNameCstring = column.c_str();
+
+        memcpy(tableData, &null_indicator, nullBytes);
+        memcpy(tableData + nullBytes, &tableNameSize, INTSIZE);
+        memcpy(tableData + nullBytes + INTSIZE, tableNameCstring, tableNameSize);
+        memcpy(tableData + nullBytes + INTSIZE + tableNameSize, &tableNameSize, INTSIZE);
+        memcpy(tableData + nullBytes + INTSIZE + tableNameSize + INTSIZE, tableNameCstring, tableNameSize);
+        recordBasedFileManager.insertRecord(tableFileHandle, tableDescriptor, tableData, temp);
+
+        delete[] tableData;
+
+        return SUCCESS;
+    }
+
+    RC RelationManager::createColumnCatalog() {
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+
+        int position;
+        RC problem = SUCCESS;
+        RID rid;
+
+        for(position = 0; position < tableDescriptor.size() ; position++) {
+            unsigned char * columnData = createAttributeDataNoTableID(tableDescriptor[position], position + 1);
+            problem += recordBasedFileManager.insertRecord(columnFileHandle, columnDescriptor, columnData, rid);
+            delete[] columnData;
+        }
+
+        for(position = 0; position < columnDescriptor.size() ; position++) {
+            unsigned char * columnData = createAttributeDataNoTableID(columnDescriptor[position], position + 1);
+            problem += recordBasedFileManager.insertRecord(columnFileHandle, columnDescriptor, columnData, rid);
+            delete[] columnData;
+        }
+
+        return SUCCESS;
+    }
+
     RC RelationManager::createCatalog() {
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         std::remove(table.c_str());
@@ -66,6 +127,10 @@ namespace PeterDB {
         createColumnDescriptor();
         catalogCreated = true;
         tableID = 0;
+
+        createTableCatalog();
+        createColumnCatalog();
+
         return problem;
     }
 
@@ -167,6 +232,27 @@ namespace PeterDB {
         return attributeData;
     }
 
+    unsigned char * RelationManager::createAttributeDataNoTableID(Attribute attr, int position) {
+        unsigned short columnAttributeLength = columnDescriptor.size();
+        unsigned short nullBytes = columnAttributeLength / 8 + (columnAttributeLength % 8 == 0 ? 0 : 1);
+        unsigned int attrNameSize = attr.name.size();
+        unsigned short expectedLength = nullBytes + INTSIZE + INTSIZE + attrNameSize + INTSIZE + INTSIZE + INTSIZE;
+        unsigned char * attributeData = new unsigned char[expectedLength];
+
+        const char * attributeNameCstring = attr.name.c_str();
+
+        unsigned char null_indicator = 128;
+        memcpy(attributeData, &null_indicator, nullBytes);
+        memcpy(attributeData + nullBytes, &attrNameSize, INTSIZE);
+        memcpy(attributeData + nullBytes + INTSIZE, attributeNameCstring, attrNameSize);
+        memcpy(attributeData + nullBytes + INTSIZE + attrNameSize, &attr.type, INTSIZE);
+        memcpy(attributeData + nullBytes + INTSIZE + attrNameSize + INTSIZE, &attr.length, INTSIZE);
+        memcpy(attributeData + nullBytes + INTSIZE + attrNameSize + INTSIZE + INTSIZE, &position, INTSIZE);
+
+        return attributeData;
+    }
+
+
     RC RelationManager::createTable(const std::string &tableName, const std::vector<Attribute> &attrs) {
         if (!catalogCreated) {
             return RC_RM_CREATE_CATALOG_ERROR;
@@ -183,7 +269,7 @@ namespace PeterDB {
         int position;
 
         for(position = 0; position < attrs.size() ; position++) {
-            unsigned char * columnData = createAttributeData(attrs[position], position);
+            unsigned char * columnData = createAttributeData(attrs[position], position + 1);
             problem += recordBasedFileManager.insertRecord(columnFileHandle, columnDescriptor, columnData, rid);
             delete[] columnData;
         }
@@ -241,6 +327,16 @@ namespace PeterDB {
         if (previousTableName == tableName) {
             attrs.erase(attrs.begin(), attrs.end());
             attrs.insert(attrs.begin(), previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+            return SUCCESS;
+        }
+        if (table == tableName) {
+            attrs.erase(attrs.begin(), attrs.end());
+            attrs.insert(attrs.begin(), tableDescriptor.begin(), tableDescriptor.end());
+            return SUCCESS;
+        }
+        if (column == tableName) {
+            attrs.erase(attrs.begin(), attrs.end());
+            attrs.insert(attrs.begin(), columnDescriptor.begin(), columnDescriptor.end());
             return SUCCESS;
         }
         if (access(tableName.c_str(), F_OK) != 0) {
@@ -317,6 +413,13 @@ namespace PeterDB {
     }
 
     unsigned RelationManager::getTableID(const std::string &tableName) {
+        if (table == tableName) {
+            return 0;
+        }
+        if (column == tableName) {
+            return 0;
+        }
+
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         std::vector<std::string> projectedAttribute = {"table-id"};
         std::vector<RID> rids;
@@ -440,6 +543,14 @@ namespace PeterDB {
             problem += getAttributes(tableName, previousRecordDescriptor);
             previousTableID = getTableID(tableName);
             previousTableName = tableName;
+        }
+        if (table == tableName) {
+            rm_ScanIterator.open(tableFileHandle, tableDescriptor, attributeNames, conditionAttribute, compOp, value);
+            return SUCCESS;
+        }
+        if (column == tableName) {
+            rm_ScanIterator.open(columnFileHandle, columnDescriptor, attributeNames, conditionAttribute, compOp, value);
+            return SUCCESS;
         }
         rm_ScanIterator.open(tableFileCollection[previousTableID-1], previousRecordDescriptor, attributeNames, conditionAttribute, compOp, value);
         return problem;

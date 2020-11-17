@@ -50,7 +50,6 @@ namespace PeterDB {
         unsigned short slotNum;
         unsigned short slotOffset;
 
-        unsigned lastSlotInserted = ((unsigned short*)pageData)[PAGE_SIZE/SHORTSIZE - 4];
         editSlotDirectory(pageData, slotNum, slotOffset, offset);
 
 
@@ -58,6 +57,20 @@ namespace PeterDB {
         writeAtFreeSpace(pageData, data, slotOffset, offset);
         // save stored page number and the slot number
         fileHandle.writePage(pageNum, pageData); // save the page to the file
+
+        unsigned short * pageSlot = (unsigned short *) pageData;
+        unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+        unsigned maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
+        unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
+        unsigned short endOfData = 4088 - 4 * maxNumOfSlot;
+        unsigned short endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+        unsigned short data_section = endOfLastSlot + availableStorage;
+
+        if (data_section != endOfData) {
+            delete[] pageSlot;
+            return RC_UPDATE_DATA_ERROR;
+        }
+
         delete[] pageData;
 
         //save slot number and page number to RID
@@ -72,8 +85,8 @@ namespace PeterDB {
         // check for size of data and where the data is located
         unsigned short * pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
         fileHandle.readPage(rid.pageNum, pageSlot);
-        unsigned slotOffset = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum];
-        unsigned dataSize = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1];
+        unsigned short slotOffset = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum];
+        unsigned short dataSize = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1];
         delete[] pageSlot;
 
         if (dataSize == 0) {
@@ -121,6 +134,21 @@ namespace PeterDB {
             RID newRid;
             newRid.pageNum = newPageNum;
             newRid.slotNum = newSlotNum;
+
+
+            unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+            unsigned maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
+            unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
+            unsigned short endOfData = 4088 - 4 * maxNumOfSlot;
+            unsigned short endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            unsigned short data_section = endOfLastSlot + availableStorage;
+
+            if (data_section != endOfData) {
+                delete[] pageSlot;
+                return RC_UPDATE_DATA_ERROR;
+            }
+
+
             delete[] pageSlot;
             return deleteRecord(fileHandle, recordDescriptor, newRid);
         } else {
@@ -128,7 +156,13 @@ namespace PeterDB {
             unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
             unsigned maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT];
             unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
-            unsigned short endOfData = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            unsigned short endOfData = 4088 - 4 * maxNumOfSlot;
+            unsigned short endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            unsigned short data_section = endOfLastSlot + availableStorage;
+            if (data_section != endOfData) {
+                delete[] pageSlot;
+                return RC_UPDATE_DATA_ERROR;
+            }
 
             RC problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
             if (problem != SUCCESS) {
@@ -143,20 +177,41 @@ namespace PeterDB {
                 pageSlot[PAGE_SIZE/SHORTSIZE - 3] = rid.slotNum;
             }
 
-            //shift Everything to the current.
-            if (endOfData != 4096 - availableStorage - 4 * maxNumOfSlot - 2*4) {
-                fileHandle.writePage(rid.pageNum, pageSlot);
-                delete[] pageSlot;
-                return RC_PAGE_SHIFT_ERROR;
-            }
             problem = shiftData(pageSlot, slotOffset, dataSize, endOfData);
             if (problem != SUCCESS) {
                 delete[] pageSlot;
                 return problem;
             }
 
+            lastSlotInserted = 1;
+            for ( int i = 2 ; i < maxNumOfSlot + 1 ; i++) {
+                unsigned lastSlotOffset = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+                unsigned newSlotOffset = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*i] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*i+1];
+                if ( pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] > 4088) {
+                    lastSlotInserted = i;
+                }
+                if ( lastSlotOffset <= newSlotOffset && pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*i] < endOfLastSlot) {
+                    lastSlotInserted = i;
+                }
+            }
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4] = lastSlotInserted;
+
             //save the page
             fileHandle.writePage(rid.pageNum, pageSlot);
+
+            lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+            maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
+            availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
+            endOfData = 4088 - 4 * maxNumOfSlot;
+            endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            data_section = endOfLastSlot + availableStorage;
+
+            if (data_section != endOfData) {
+                delete[] pageSlot;
+                return RC_UPDATE_DATA_ERROR;
+            }
+
+
             delete[] pageSlot;
             return SUCCESS;
         }
@@ -214,8 +269,15 @@ namespace PeterDB {
         unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
         unsigned maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
         unsigned availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
-        unsigned short endOfData = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+        unsigned short endOfData = 4088 - 4 * maxNumOfSlot;
+        unsigned short endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+        unsigned short data_section = endOfLastSlot + availableStorage;
         bool inPage = true;
+
+        if (data_section != endOfData) {
+            delete[] pageSlot;
+            return RC_UPDATE_DATA_ERROR;
+        }
 
         if (slotOffset >= 32768 && dataSize > 32768) {
             unsigned newPageNum = 65536 - slotOffset;
@@ -255,7 +317,7 @@ namespace PeterDB {
             //shift Everything to the current.
 
             if (inPage) {
-                problem = shiftData(pageSlot, index, dataSize - offset, (4088 - 4 * maxNumOfSlot));
+                problem = shiftData(pageSlot, index, dataSize - offset, endOfData);
             }
             if (problem != SUCCESS) {
                 delete[] pageSlot;
@@ -264,22 +326,38 @@ namespace PeterDB {
 
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
-            return SUCCESS;
         } else if (offset <= availableStorage + dataSize) {
             delete[] pageSlot;
             deleteRecord(fileHandle, recordDescriptor, rid);
 
             pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
             fileHandle.readPage(rid.pageNum, pageSlot);
-            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum] = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+            lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+            pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum] = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * lastSlotInserted + 1];
             pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum + 1] = offset;
+
+            for(int i = 0; i < pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT]; i++) {
+                if(pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i + 1] == 0) {
+                    pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = i + 1;
+                    break;
+                } else {
+                    pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = 0;
+                }
+            }
+
+            pageSlot[PAGE_SIZE/SHORTSIZE - LASTSLOTEDITED] = rid.slotNum;
+            pageSlot[PAGE_SIZE/SHORTSIZE - FREESPACE] -= offset;
             writeAtFreeSpace(pageSlot, data, pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2 * rid.slotNum], offset);
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
-            return SUCCESS;
         } else {
             // find the page that have free space
+            // Change slot directory
             delete[] pageSlot;
+            RC problem = deleteRecord(fileHandle, recordDescriptor, rid);
+            if (problem != SUCCESS) {
+                return problem;
+            }
 
             RID newrid;
             insertRecord(fileHandle, recordDescriptor, data, newrid);
@@ -287,28 +365,39 @@ namespace PeterDB {
             pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
             fileHandle.readPage(rid.pageNum, pageSlot);
 
-            // Change slot directory
-            RC problem = SUCCESS;
-            if (inPage) {
-                problem = shiftSlot(pageSlot, maxNumOfSlot, slotOffset, dataSize);
-            }
-            if (problem != SUCCESS) {
-                delete[] pageSlot;
-                return problem;
-            }
             pageSlot[PAGE_SIZE / SHORTSIZE - 4 - 2 * rid.slotNum] = 65535 - newrid.pageNum + 1;
             pageSlot[PAGE_SIZE / SHORTSIZE - 4 - 2 * rid.slotNum + 1] = 65535 - newrid.slotNum + 1;
-            pageSlot[PAGE_SIZE / SHORTSIZE - 1] += dataSize;
 
-
-            if (inPage) {
-                problem = shiftData(pageSlot, slotOffset, dataSize, (unsigned short)(4088 - 4 * maxNumOfSlot));
+            for(int i = 0; i < pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT]; i++) {
+                if(pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i + 1] == 0) {
+                    pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = i + 1;
+                    break;
+                } else {
+                    pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = 0;
+                }
             }
-            //save the page
+
             fileHandle.writePage(rid.pageNum, pageSlot);
             delete[] pageSlot;
-            return SUCCESS;
         }
+
+        pageSlot = new unsigned short[PAGE_SIZE/SHORTSIZE];
+        fileHandle.readPage(rid.pageNum, pageSlot);
+        slotOffset = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum];
+        dataSize = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*rid.slotNum + 1];
+        lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+        maxNumOfSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 2];
+        availableStorage = pageSlot[PAGE_SIZE/SHORTSIZE - 1];
+        endOfData = 4088 - 4 * maxNumOfSlot;
+        endOfLastSlot = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
+        data_section = endOfLastSlot + availableStorage;
+
+        if (data_section != endOfData) {
+            delete[] pageSlot;
+            return RC_UPDATE_DATA_ERROR;
+        }
+
+        delete[] pageSlot;
         return SUCCESS;
     }
 
@@ -442,7 +531,7 @@ namespace PeterDB {
         unsigned short * pageSlot = (unsigned short *) page;
         bool add4byte = false;
         slotOffSet = 0;
-        unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - 4];
+        unsigned lastSlotInserted = pageSlot[PAGE_SIZE/SHORTSIZE - LASTSLOTEDITED];
 
         if (lastSlotInserted != 0) {
             slotOffSet = pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted] + pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*lastSlotInserted + 1];
@@ -458,18 +547,20 @@ namespace PeterDB {
         } else {
             slotNum = pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE];
 
-            for(int i = 0; i < pageSlot[PAGE_SIZE/SHORTSIZE - 2]; i++) {
+            for(int i = 0; i < pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT]; i++) {
                 if(pageSlot[PAGE_SIZE/SHORTSIZE - 6 - 2*i + 1] == 0) {
                     pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = i + 1;
                     break;
+                } else {
+                    pageSlot[PAGE_SIZE/SHORTSIZE - SLOTTOUSE] = 0;
                 }
             }
         }
         pageSlot[PAGE_SIZE/SHORTSIZE - LASTSLOTEDITED] = slotNum;
-        pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT] += 1;
         pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*slotNum] = slotOffSet;
         pageSlot[PAGE_SIZE/SHORTSIZE - 4 - 2*slotNum + 1] = offset;
         if(add4byte) {
+            pageSlot[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT] += 1;
             pageSlot[PAGE_SIZE/SHORTSIZE - FREESPACE] -= offset + 4;
         } else {
             pageSlot[PAGE_SIZE/SHORTSIZE - FREESPACE] -= offset;
@@ -486,6 +577,7 @@ namespace PeterDB {
             return RC_PAGE_SHIFT_ERROR;
         }
         unsigned char * pageData = (unsigned char * ) page;
+        //memmove(pageData + slotOffSet, pageData + slotOffSet + dataSize, endOfData - slotOffSet);
         for(unsigned int i = slotOffSet; i < endOfData - dataSize; i++){
             pageData[i] = pageData[i+dataSize];
         }
@@ -525,7 +617,7 @@ namespace PeterDB {
 
     RC RBFM_ScanIterator::close() {
         delete[] (char*)pageData;
-        storedFileHandle.closeFile();
+        //storedFileHandle.closeFile();
         return SUCCESS;
     }
 
@@ -577,11 +669,11 @@ namespace PeterDB {
         unsigned short * slotDirectory = (unsigned short *)pageData;
         if((currentSlotNum == maxSlotNum && currentPageNum + 1 == maxPageNum) || maxPageNum == 0) {
             return RBFM_EOF;
-        } else if (currentSlotNum >= maxSlotNum) {
+        } else if (currentSlotNum > maxSlotNum) {
             currentSlotNum = 1;
-            maxSlotNum = slotDirectory[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT];
             currentPageNum += 1;
             storedFileHandle.readPage(currentPageNum, pageData);
+            maxSlotNum = slotDirectory[PAGE_SIZE/SHORTSIZE - MAXNUMSLOT];
         } else {
             currentSlotNum += 1;
         }
@@ -758,54 +850,61 @@ namespace PeterDB {
 
         memcpy(recordNullIndicator, (char*)record+recordOffSet, recordNullBytes);
 
-        recordOffSet += recordNullBytes;
         dataOffSet += dataNullBytes;
+        for( ; scanAttrIndex < dataAttributeLength ; scanAttrIndex++) {
+            recordOffSet = 0;
+            nullBit = false;
+            recordOffSet += recordNullBytes;
+            for (int i = 0; i < recordAttrubuteLength; i++) {
+                unsigned char mask = (unsigned) 1 << (unsigned) (7 - i % 8);
+                nullBit = recordNullIndicator[i / 8] & mask;
 
-        for(int i = 0 ; i < recordAttrubuteLength ; i++ ){
-            unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
-            nullBit = recordNullIndicator[i/8] & mask;
+                if (scanAttr->at(scanAttrIndex) == AttributeDescriptor->at(i).name) {
+                    unsigned char *saveAttribute = (unsigned char *) data;
+                    if (nullBit) {
+                        unsigned char newMask = (unsigned) 1 << (unsigned) (7 - i % 8);
+                        dataNullIndicator[scanAttrIndex / 8] += newMask;
+                    } else {
+                        switch (AttributeDescriptor->at(i).type) {
+                            case AttrType::TypeInt: {
+                                memcpy((char *) data + dataOffSet, (char *) record + recordOffSet, INTSIZE);
+                                dataOffSet += INTSIZE;
+                                break;
+                            }
+                            case AttrType::TypeReal: {
+                                memcpy((char *) data + dataOffSet, (char *) record + recordOffSet, FLOATSIZE);
+                                dataOffSet += FLOATSIZE;
+                                break;
+                            }
+                            case AttrType::TypeVarChar: {
+                                unsigned int number_of_char = *((unsigned int *) ((char *) record + recordOffSet));
+                                memcpy((char *) data + dataOffSet, (char *) record + recordOffSet,
+                                       number_of_char + INTSIZE);
+                                dataOffSet += INTSIZE;
+                                dataOffSet += number_of_char;
+                            }
+                        }
+                    }
+                    break;
+                }
 
-            if (scanAttr->at(scanAttrIndex) == AttributeDescriptor->at(i).name) {
-                unsigned char * saveAttribute = (unsigned char*) data;
-                if (nullBit) {
-                    unsigned char newMask = (unsigned) 1 << (unsigned) (7 - i % 8);
-                    dataNullIndicator[scanAttrIndex/8] += newMask;
-                } else {
+                if (!nullBit) {
                     switch (AttributeDescriptor->at(i).type) {
                         case AttrType::TypeInt: {
-                            memcpy((char*)data + dataOffSet, (char*)record + recordOffSet, INTSIZE);
-                            dataOffSet += INTSIZE; break;
+                            recordOffSet += INTSIZE;
+                            break;
                         }
                         case AttrType::TypeReal: {
-                            memcpy((char*)data + dataOffSet, (char*)record + recordOffSet, FLOATSIZE);
-                            dataOffSet += FLOATSIZE; break;
+                            recordOffSet += FLOATSIZE;
+                            break;
                         }
                         case AttrType::TypeVarChar: {
-                            unsigned int number_of_char =  *((unsigned int * )((char*)record+recordOffSet));
-                            memcpy((char*)data + dataOffSet, (char*)record + recordOffSet, number_of_char + INTSIZE);
-                            dataOffSet += INTSIZE;
-                            dataOffSet += number_of_char;
+                            unsigned int number_of_char = *((unsigned int *) ((char *) record + recordOffSet));
+                            recordOffSet += INTSIZE;
+                            recordOffSet += number_of_char;
                         }
                     }
                 }
-                scanAttrIndex++;
-            }
-
-            switch (AttributeDescriptor->at(i).type) {
-                case AttrType::TypeInt: {
-                    recordOffSet += INTSIZE; break;
-                }
-                case AttrType::TypeReal: {
-                    recordOffSet += FLOATSIZE; break;
-                }
-                case AttrType::TypeVarChar: {
-                    unsigned int number_of_char =  *((unsigned int * )((char*)record + recordOffSet));
-                    recordOffSet += INTSIZE;
-                    recordOffSet += number_of_char;
-                }
-            }
-            if (scanAttrIndex == dataAttributeLength) {
-                break;
             }
         }
 

@@ -519,7 +519,7 @@ namespace PeterDBTesting {
             prepareLargeTuple(attrs.size(), nullsIndicator, i + 10, inBuffer, size);
 
             ASSERT_EQ(rm.updateTuple(tableName, inBuffer, rid), success)
-                                        << "RelationManager::updateTuple() should succeed at." << i;
+                                        << "RelationManager::updateTuple() should succeed at ." << i;
 
             sizes[i] = size;
             rids[i] = rid;
@@ -529,14 +529,11 @@ namespace PeterDBTesting {
         for (unsigned i = numTuples - numTuplesToUpdate2; i < numTuples; i++) {
             memset(inBuffer, 0, bufSize);
             rid = rids[i];
-            if (rid.pageNum == 301 && rid.slotNum == 9){
-                unsigned what =0;
-            }
 
             prepareLargeTuple(attrs.size(), nullsIndicator, i - 10, inBuffer, size);
 
             ASSERT_EQ(rm.updateTuple(tableName, inBuffer, rid), success)
-                                        << "RelationManager::updateTuple() should succeed.";
+                                        << "RelationManager::updateTuple() should succeed at ." << i ;
 
             sizes[i] = size;
             rids[i] = rid;
@@ -544,15 +541,16 @@ namespace PeterDBTesting {
 
         // Read the updated records and check the integrity
         for (unsigned i = 0; i < numTuplesToUpdate1; i++) {
+
             memset(inBuffer, 0, bufSize);
             memset(outBuffer, 0, bufSize);
             prepareLargeTuple(attrs.size(), nullsIndicator, i + 10, inBuffer, size);
 
             ASSERT_EQ(rm.readTuple(tableName, rids[i], outBuffer), success)
-                                        << "RelationManager::readTuple() should succeed.";
+                                        << "RelationManager::readTuple() should succeed at ." << i;
 
             // Compare whether the two memory blocks are the same
-            ASSERT_EQ(memcmp(inBuffer, outBuffer, size), 0) << "the read tuple should match the updated tuple";
+            ASSERT_EQ(memcmp(inBuffer, outBuffer, size), 0) << "the read tuple should match the updated tuple at " << i;
 
         }
 
@@ -600,7 +598,6 @@ namespace PeterDBTesting {
 
         // Delete the first numTuplesToDelete tuples
         for (unsigned i = 0; i < numTuplesToDelete; i++) {
-
             ASSERT_EQ(rm.deleteTuple(tableName, rids[i]), success) << "RelationManager::deleteTuple() should succeed at. " << i;
         }
 
