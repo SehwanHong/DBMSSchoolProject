@@ -844,6 +844,7 @@ namespace PeterDB {
             storedIXFileHandle->readPage(currentPage, data);
             directory = (unsigned short*) data;
             numberOfRecord = directory[PAGE_SIZE/SHORTSIZE - NUMRECORD];
+            prev_numberOfRecord = numberOfRecord;
             currentSlot = 0;
         }
         if (high == NULL) {
