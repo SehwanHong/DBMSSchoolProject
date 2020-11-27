@@ -179,6 +179,8 @@ namespace PeterDBTesting {
         ASSERT_EQ(ix.printBTree(ixFileHandle, ageAttr, stream), success)
                                     << "indexManager::printBTree() should succeed.";
 
+        LOG(INFO) << stream.str();
+
         validateTree(stream, 0, 0, 0, PAGE_SIZE / 10 / 2, true);
 
         EXPECT_GE(getFileSize(indexFileName) / PAGE_SIZE, 2) << "File size should get increased.";

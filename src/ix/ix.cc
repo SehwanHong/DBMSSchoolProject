@@ -339,9 +339,9 @@ namespace PeterDB {
             directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1] = -1;
             j++;
         }
-        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] + directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (divisionPoint) + 1];
-        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint)] = endOfPoint;
-        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint) + 1] = -1;
+        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint)] + directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (divisionPoint) + 1];
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint + 1)] = endOfPoint;
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint + 1) + 1] = -1;
         directory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6 - 4 * (divisionPoint + 1);
         if (endOfPoint != offset) {
             int error = 0;
@@ -399,9 +399,9 @@ namespace PeterDB {
             directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1] = -1;
             j++;
         }
-        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint - 1)] + directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (divisionPoint - 1) + 1];
-        directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] = endOfPoint;
-        directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint) + 1] = -1;
+        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint)] + directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (divisionPoint) + 1];
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint+1)] = endOfPoint;
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint+1) + 1] = -1;
         directory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6 - 4 * (divisionPoint + 1);
         if (endOfPoint != offset) {
             int error = 0;
@@ -799,7 +799,7 @@ namespace PeterDB {
             unsigned totalsize = ((unsigned short*)rootNode)[PAGE_SIZE/SHORTSIZE - 5 - 2 * i + 1];
             pageNumbers.push_back(*(int*)(data+offset));
             offset += INTSIZE;
-            if (totalsize == 65535) {
+            if (pageNumbers.size() > numberOfRecord){
                 break;
             }
             unsigned length = 0;
@@ -889,9 +889,8 @@ namespace PeterDB {
             }
             if (!skip) {
                 if (i != 0 ){
-                    out << "]\" , ";
+                    out << "]\",";
                 }
-
                 switch(attribute.type) {
                     case AttrType::TypeInt:
                         out << "\"" << *((int*)(data+offset)) << ":[";
@@ -908,7 +907,7 @@ namespace PeterDB {
                         break;
                 }
             } else {
-                out << ", ";
+                out << ",";
             }
             switch(attribute.type) {
                 case AttrType::TypeInt:
@@ -924,8 +923,11 @@ namespace PeterDB {
                     break;
             }
             out << "(" << *((unsigned int*)(data+offset)) << "," << *((unsigned short*)(data+offset+INTSIZE)) << ")";
+            if (i == numberOfRecord - 1) {
+                out << "]\"";
+            }
         }
-        out << "]\"]}";
+        out << "]}";
         delete[] key;
         return SUCCESS;
     }
