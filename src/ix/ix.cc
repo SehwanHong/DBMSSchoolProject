@@ -112,8 +112,6 @@ namespace PeterDB {
         char * goingUp = NULL;
         int goingSize;
         unsigned newLeafPageNum = ixFileHandle.getNumberOfPages();
-        unsigned goingUp_prev = 0;
-        unsigned goingUp_next = 0;
 
         for(int i = numberOfSelectedPages - 1; i > -1; i--) {
 
@@ -125,18 +123,22 @@ namespace PeterDB {
 
             offset = directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * slotUsed[i]];
             bool leafNode = directory[PAGE_SIZE/SHORTSIZE - LEAFNODE] == 0;
+
             if ( leafNode && freeSpace < totalSize + 4) {
                 char * newLeafPage = new char[PAGE_SIZE];
                 createLeafNode(newLeafPage);
                 //break and connect the leaf nodes.
                 unsigned currentSlotInput = slotUsed[i];
+                if (newLeafPageNum == 228) {
+                    int error = 0;
+                }
                 splitHalf(selectedPages[i], newLeafPage, pageRead[i], newLeafPageNum);
                 unsigned short * newDirectory = (unsigned short*) newLeafPage;
                 if (currentSlotInput < numberOfRecord/2) {
                     selectedPages[i];
                     shift(selectedPages[i], offset, currentSlotInput, modifiedKey, totalSize);
                 } else {
-                    currentSlotInput = currentSlotInput - numberOfRecord/2 + 1;
+                    currentSlotInput = currentSlotInput - numberOfRecord/2;
                     offset = newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * currentSlotInput];
                     shift(newLeafPage, offset, currentSlotInput, modifiedKey, totalSize);
                 }
@@ -165,8 +167,6 @@ namespace PeterDB {
                     goingUp = new char[goingSize];
                     memcpy(goingUp, newLeafPage, goingSize);
                     memcpy(goingUp, &newLeafPageNum, INTSIZE);
-                    goingUp_prev = pageRead[i];
-                    goingUp_next = newLeafPageNum;
                 }
                 delete[] newLeafPage;
                 breakNode = true;
@@ -188,13 +188,18 @@ namespace PeterDB {
                 unsigned currentSlotInput = slotUsed[i];
                 unsigned short * newDirectory = (unsigned short*) newLeafPage;
                 newLeafPageNum = ixFileHandle.getNumberOfPages();
-                splitHalf(selectedPages[i], newLeafPage, goingUp_prev, goingUp_next);
+                unsigned middleSize = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * numberOfRecord/2 + 1];
+                char * middleUp = new char[middleSize];
+                memcpy(middleUp, &newLeafPageNum, INTSIZE);
 
-                if (currentSlotInput < numberOfRecord/2) {
+
+                if (currentSlotInput <= numberOfRecord/2) {
+                    splitHalfMiddleLeft(selectedPages[i], newLeafPage, middleUp, middleSize);
                     selectedPages[i];
                     shiftMiddleNode(selectedPages[i], offset, currentSlotInput, goingUp, goingSize);
                 } else {
-                    currentSlotInput = currentSlotInput - numberOfRecord/2 + 1;
+                    splitHalfMiddleRight(selectedPages[i], newLeafPage, middleUp, middleSize);
+                    currentSlotInput = currentSlotInput - numberOfRecord/2 - 1;
                     offset = newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * currentSlotInput];
                     shiftMiddleNode(newLeafPage, offset, currentSlotInput, goingUp, goingSize);
                 }
@@ -208,32 +213,30 @@ namespace PeterDB {
                     char * newRootNode = new char[PAGE_SIZE];
                     createRootNode(newRootNode);
                     unsigned short * newDirectory = (unsigned short*) newLeafPage;
-                    unsigned firstEntryLength = newDirectory[PAGE_SIZE/SHORTSIZE - 4];
-                    char * firstEntry = new char[firstEntryLength];
-                    memcpy(firstEntry,newLeafPage,firstEntryLength);
+                    char * firstEntry = new char[middleSize];
+                    memcpy(firstEntry + 4 , middleUp + 4, middleSize - 4);
                     ((unsigned*)firstEntry)[0] = pageRead[i];
-                    insertFirstEntry(newRootNode, firstEntry, firstEntryLength,false);
-                    memcpy(newRootNode + firstEntryLength, &newLeafPageNum, INTSIZE);
+                    insertFirstEntry(newRootNode, firstEntry, middleSize,false);
+                    memcpy(newRootNode + middleSize, middleUp, INTSIZE);
                     ixFileHandle.appendPage(newRootNode);
                     delete[] firstEntry;
                     delete[] newRootNode;
                 } else {
-                    unsigned short * newDirectory = (unsigned short*) newLeafPage;
-                    goingSize = newDirectory[PAGE_SIZE / SHORTSIZE - 3 - 2 * 1 + 1];
                     delete[] goingUp;
-                    goingUp = new char[goingSize];
-                    memcpy(goingUp, newLeafPage, goingSize);
-                    memcpy(goingUp, &newLeafPageNum, INTSIZE);
-                    goingUp_prev = newLeafPageNum;
-                    goingUp_next = pageRead[i];
+                    goingUp = new char[middleSize];
+                    memcpy(goingUp, middleUp, middleSize);
                 }
                 breakNode = true;
                 if (breakNode) {
                     int NeedToBreakNode = 0;
                 }
+                delete[] middleUp;
                 delete[] newLeafPage;
                 //break do not need to connect
             } else {
+                if (pageRead[i] == 230) {
+                    int wait = 0;
+                }
                 //add node on the slot
                 shiftMiddleNode(rootNode, offset, slotUsed[i], goingUp, goingSize);
                 ixFileHandle.writePage(pageRead[i],selectedPages[i]);
@@ -252,27 +255,29 @@ namespace PeterDB {
         unsigned freeSpace = directory[PAGE_SIZE/SHORTSIZE - FREESPACE];
         unsigned numberOfRecord = directory[PAGE_SIZE/SHORTSIZE - NUMRECORD];
 
-        unsigned divisionPoint = numberOfRecord/2;
+        unsigned divisionPoint = numberOfRecord/2 + 1;
         unsigned offset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * divisionPoint];
         unsigned short * newDirectory = (unsigned short*) newData;
         int j = 0;
         char * originalNode = (char*) originalData;
         char * newNode = (char*) newData;
+
         for(int i = offset ; i < 4096 - 6 - 4*( numberOfRecord + 1 ); i++) {
             newNode[j] = originalNode[i];
             originalNode[i] = -1;
             j++;
         }
+
         memcpy(originalNode + offset, &newPage, INTSIZE);
         memcpy(newNode, &originalPage, INTSIZE);
 
 
-        directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] -= divisionPoint;
-        directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] -= 1;
+        directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = divisionPoint - 1;
         directory[PAGE_SIZE/SHORTSIZE - FREESPACE] += divisionPoint * 4;
         j = 0;
         for (int i = divisionPoint ; i < numberOfRecord + 1 ; i++ ) {
-            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j] = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] - offset;
+            unsigned int movedPosition = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] - offset;
+            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j] = movedPosition;
             newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j + 1] = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1];
             directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] = -1;
             directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1] = -1;
@@ -287,8 +292,127 @@ namespace PeterDB {
         }
         unsigned tempOffset = newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j -1) ] + newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j-1) + 1];
         newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (j)] = tempOffset;
-        newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (j) + 1] = -1;
+        //newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (j) + 1] = -1;
+        if( j != numberOfRecord - divisionPoint) {
+            int wait = 0;
+        }
         newDirectory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = j;
+        newDirectory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * j ] - 6 - 4 * (j + 2);
+
+    }
+
+    RC IndexManager::splitHalfMiddleRight(void * originalData, void * newData,
+                                     void * middleUp, unsigned &middleSize) {
+        unsigned short * directory = (unsigned short*) originalData;
+        unsigned freeSpace = directory[PAGE_SIZE/SHORTSIZE - FREESPACE];
+        unsigned numberOfRecord = directory[PAGE_SIZE/SHORTSIZE - NUMRECORD];
+
+        unsigned divisionPoint = numberOfRecord/2 + 1;
+        unsigned offset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * divisionPoint];
+        unsigned short * newDirectory = (unsigned short*) newData;
+        int j = 0;
+        char * originalNode = (char*) originalData;
+        char * newNode = (char*) newData;
+        unsigned middleOffset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint + 1)];
+        middleSize = middleOffset - offset;
+        memcpy((char*)middleUp + INTSIZE, originalNode + offset + INTSIZE, middleSize - INTSIZE);
+        int key = *(int*)((char*)middleUp + 4);
+
+        for(int i = middleOffset; i < 4096 - 6 - 4*( numberOfRecord + 1 ); i++) {
+            newNode[j] = originalNode[i];
+            originalNode[i] = -1;
+            j++;
+        }
+
+        for(int i = offset + 4; i < middleOffset; i++) {
+            originalNode[i] = -1;
+        }
+
+        directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = divisionPoint - 1;
+        directory[PAGE_SIZE/SHORTSIZE - FREESPACE] += divisionPoint * 4;
+        j = 0;
+        for (int i = divisionPoint + 1 ; i < numberOfRecord + 1 ; i++ ) {
+            unsigned short PrevOffset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] - middleOffset;
+            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j] = PrevOffset;
+            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j + 1] = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1];
+            directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] = -1;
+            directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1] = -1;
+            j++;
+        }
+        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] + directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (divisionPoint) + 1];
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint)] = endOfPoint;
+        directory[PAGE_SIZE/SHORTSIZE - 5  - 2 * (divisionPoint) + 1] = -1;
+        directory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6 - 4 * (divisionPoint + 1);
+        if (endOfPoint != offset) {
+            int error = 0;
+        }
+        for (int i = endOfPoint + 4; i < 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6; i++){
+            ((char*)originalData)[i] = -1;
+        }
+
+        if(j != numberOfRecord - divisionPoint) {
+            int wait = 0;
+        }
+        newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * j] = newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j - 1) ] + newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j - 1) + 1 ];
+        newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord - divisionPoint) + 1] = -1;
+        //newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * j] = newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * (j - 1) ] + newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * (j - 1) + 1 ];
+        newDirectory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = numberOfRecord - divisionPoint;
+        newDirectory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * j ] - 6 - 4 * (j + 2);
+
+    }
+
+    RC IndexManager::splitHalfMiddleLeft(void * originalData, void * newData,
+                                          void * middleUp, unsigned &middleSize) {
+        unsigned short * directory = (unsigned short*) originalData;
+        unsigned freeSpace = directory[PAGE_SIZE/SHORTSIZE - FREESPACE];
+        unsigned numberOfRecord = directory[PAGE_SIZE/SHORTSIZE - NUMRECORD];
+
+        unsigned divisionPoint = numberOfRecord/2;
+        unsigned offset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * divisionPoint];
+        unsigned short * newDirectory = (unsigned short*) newData;
+        int j = 0;
+        char * originalNode = (char*) originalData;
+        char * newNode = (char*) newData;
+        unsigned middleOffset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint + 1)];
+        middleSize = middleOffset - offset;
+        memcpy((char*)middleUp + INTSIZE, originalNode + offset + INTSIZE, middleSize - INTSIZE);
+        int key = *(int*)((char*)middleUp + 4);
+
+        for(int i = middleOffset; i < 4096 - 6 - 4*( numberOfRecord + 1 ); i++) {
+            newNode[j] = originalNode[i];
+            originalNode[i] = -1;
+            j++;
+        }
+
+        for(int i = offset + 4; i < middleOffset; i++) {
+            originalNode[i] = -1;
+        }
+
+        directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = divisionPoint - 1;
+        directory[PAGE_SIZE/SHORTSIZE - FREESPACE] += divisionPoint * 4;
+        j = 0;
+        for (int i = divisionPoint + 1 ; i < numberOfRecord + 1 ; i++ ) {
+            unsigned short PrevOffset = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] - middleOffset;
+            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j] = PrevOffset;
+            newDirectory[PAGE_SIZE/SHORTSIZE - 5  - 2 * j + 1] = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1];
+            directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i] = -1;
+            directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * i + 1] = -1;
+            j++;
+        }
+        unsigned endOfPoint = directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint - 1)] + directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (divisionPoint - 1) + 1];
+        directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] = endOfPoint;
+        directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint) + 1] = -1;
+        directory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6 - 4 * (divisionPoint + 1);
+        if (endOfPoint != offset) {
+            int error = 0;
+        }
+        for (int i = endOfPoint + 4; i < 4096 - directory[PAGE_SIZE/SHORTSIZE - 3  - 2 * (divisionPoint)] - 6; i++){
+            ((char*)originalData)[i] = -1;
+        }
+        newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * j] = newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j - 1) ] + newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (j - 1) + 1 ];
+        newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord - divisionPoint) + 1] = -1;
+        //newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * j] = newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * (j - 1) ] + newDirectory[PAGE_SIZE/SHORTSIZE - 7 - 2 * (j - 1) + 1 ];
+        newDirectory[PAGE_SIZE/SHORTSIZE - NUMRECORD] = numberOfRecord - divisionPoint;
         newDirectory[PAGE_SIZE/SHORTSIZE - FREESPACE] = 4096 - newDirectory[PAGE_SIZE/SHORTSIZE - 5 - 2 * j ] - 6 - 4 * (j + 2);
 
     }
@@ -328,13 +452,14 @@ namespace PeterDB {
         directory[PAGE_SIZE/SHORTSIZE - FREESPACE] -= 4;
         directory[PAGE_SIZE/SHORTSIZE - NUMRECORD] += 1;
         unsigned tempOffset, tempTotalSize;
-        for (int i = numberOfRecord + 1; i > slotToUse; i--) {
+        for (int i = numberOfRecord + 1; i > slotToUse ; i--) {
             tempOffset = directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * i];
             tempTotalSize = directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * i + 1];
             unsigned short result = tempOffset + totalSize;
             directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (i+1) ] = result;
             directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (i+1) + 1] = tempTotalSize;
         }
+        directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (slotToUse + 1)] = offset;
         directory[PAGE_SIZE/SHORTSIZE - 3 - 2 * (slotToUse + 1) + 1] = totalSize;
         unsigned char * indexData = (unsigned char * ) data;
         //memmove(pageData + slotOffSet, pageData + slotOffSet + dataSize, endOfData - slotOffSet);
@@ -361,6 +486,7 @@ namespace PeterDB {
         unsigned offset = 0;
         bool leafNode = directory[PAGE_SIZE/SHORTSIZE - LEAFNODE] == 0;
         unsigned page = rootPage;
+        unsigned problem = SUCCESS;
 
         while(!findPlace || !leafNode) {
             if (findPlace) {
@@ -369,7 +495,7 @@ namespace PeterDB {
                 numberOfSelectedPage++;
                 pageRead.push_back(page);
                 slotUsed.push_back(current);
-                page = *(int*)((char*)data + offset);;
+                page = *(int*)((char*)data + offset);
                 data = new char[PAGE_SIZE];
                 ixFileHandle.readPage(page, data);
                 directory = (unsigned short*) data;
@@ -396,15 +522,20 @@ namespace PeterDB {
                     shift = compareVarChar(data, offset, key, rid);
                     break;
             }
-            if (shift == 1) {
-                lower = current + 1;
-            } else if (shift == 100 && leafNode) {
+            if (shift == 100 && leafNode) {
                 break;
+            } else if (shift == 1) {
+                lower = current + 1;
+            } else if (shift == 100) {
+                lower = current + 1;
             } else {
                 upper = current - 1;
             }
             if (upper - lower < 0) {
                 findPlace = true;
+                if (leafNode && shift != 100) {
+                    problem += 110;
+                }
                 //current = (lower + upper)/2;
                 if( lower > numberOfRecord) {
                     current = numberOfRecord;
@@ -420,7 +551,7 @@ namespace PeterDB {
         numberOfSelectedPage++;
         pageRead.push_back(page);
         slotUsed.push_back(current);
-        return SUCCESS;
+        return problem;
     }
 
     int IndexManager::getLengthOfKey(const Attribute & attribute, const void * key) {
@@ -434,7 +565,8 @@ namespace PeterDB {
                 break;
             case AttrType::TypeVarChar:
                 lengthOfKey += INTSIZE;
-                lengthOfKey += *(int*)((char*)key + lengthOfKey);
+                int length_of_string = *(int*)((char*)key);
+                lengthOfKey += length_of_string;
         }
         return lengthOfKey;
     }
@@ -612,6 +744,7 @@ namespace PeterDB {
             directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * i ] = result;
             directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * i + 1] = tempTotalSize;
         }
+        directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord)] = directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord - 1) + 1] + directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord - 1)];
         directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * (numberOfRecord) + 1] = -1;
         unsigned char * indexData = (unsigned char * ) data;
         //memmove(pageData + slotOffSet, pageData + slotOffSet + dataSize, endOfData - slotOffSet);
@@ -661,8 +794,14 @@ namespace PeterDB {
         bool skip = false;
         std::vector<int> pageNumbers;
         unsigned numberOfRecord = ((unsigned short*)rootNode)[PAGE_SIZE/SHORTSIZE - NUMRECORD];
-        for ( int i = 0 ; i < numberOfRecord ; i++) {
+        for ( int i = 0 ; i < numberOfRecord + 1 ; i++) {
             unsigned offset = ((unsigned short*)rootNode)[PAGE_SIZE/SHORTSIZE - 5 - 2 * i];
+            unsigned totalsize = ((unsigned short*)rootNode)[PAGE_SIZE/SHORTSIZE - 5 - 2 * i + 1];
+            pageNumbers.push_back(*(int*)(data+offset));
+            offset += INTSIZE;
+            if (totalsize == 65535) {
+                break;
+            }
             unsigned length = 0;
             switch(attribute.type) {
                 case AttrType::TypeInt:
@@ -672,36 +811,23 @@ namespace PeterDB {
                     length += FLOATSIZE;
                     break;
                 case AttrType::TypeVarChar:
-                    length += *((int *) (data + offset + INTSIZE));
+                    length += *((int *) (data + offset));
+                    offset += INTSIZE;
                     break;
             }
-            pageNumbers.push_back(*(int*)(data+offset));
             switch(attribute.type) {
                 case AttrType::TypeInt:
-                    out << "\"" << *((int *) (data + offset + INTSIZE)) << "\"";
-                    memcpy(key, data + offset + INTSIZE, length);
+                    out << "\"" << *((int *) (data + offset)) << "\"";
+                    memcpy(key, data + offset, length);
                     break;
                 case AttrType::TypeReal:
-                    out << "\"" << *((float *) (data + offset + INTSIZE)) << "\"";
-                    memcpy(key, data + offset + INTSIZE, length);
+                    out << "\"" << *((float *) (data + offset)) << "\"";
+                    memcpy(key, data + offset, length);
                     break;
                 case AttrType::TypeVarChar:
-                    memcpy(key, data + offset + INTSIZE + INTSIZE, length);
+                    memcpy(key, data + offset, length);
                     key[length] = '\0';
                     out << "\"" << key << "\"";
-                    break;
-            }
-            switch(attribute.type) {
-                case AttrType::TypeInt:
-                    offset += INTSIZE;
-                    break;
-                case AttrType::TypeReal:
-                    offset += FLOATSIZE;
-                    break;
-                case AttrType::TypeVarChar:
-                    offset += INTSIZE;
-                    length = *((int *) (data + offset + INTSIZE));
-                    offset += length;
                     break;
             }
             if (i != numberOfRecord-1) {
@@ -710,7 +836,7 @@ namespace PeterDB {
         }
         delete[] key;
         out << "] , ";
-        out << "children : [";
+        out << " \"children\" : [";
         for (int i = 0; i<pageNumbers.size() ; i++) {
             ixFileHandle.readPage(pageNumbers.at(i), rootNode);
             bool leafNode = ((unsigned short*)rootNode)[PAGE_SIZE/SHORTSIZE - LEAFNODE] == 0;
@@ -718,6 +844,9 @@ namespace PeterDB {
                 printBTreeLeaf(rootNode, attribute, out);
             } else {
                 printBTreeRoot(rootNode, ixFileHandle, attribute, out);
+            }
+            if (i != pageNumbers.size() - 1) {
+                out << ",";
             }
         }
         out << "]}";
@@ -742,7 +871,7 @@ namespace PeterDB {
                     length += FLOATSIZE;
                     break;
                 case AttrType::TypeVarChar:
-                    length += *((int *) (data + offset + INTSIZE));
+                    length += *((int *) (data + offset));
                     break;
             }
             if (attribute.type != AttrType::TypeVarChar) {
@@ -751,13 +880,16 @@ namespace PeterDB {
                 } else {
                     skip = false;
                 }
+            } else {
+                if (memcmp(key,data + offset + INTSIZE, length) == 0) {
+                    skip = true;
+                } else {
+                    skip = false;
+                }
             }
             if (!skip) {
-                if( i !=0 ){
-                    out << "]\"";
-                }
-                if ( i != numberOfRecord -1 ){
-                    out << ", ";
+                if (i != 0 ){
+                    out << "]\" , ";
                 }
 
                 switch(attribute.type) {
@@ -775,6 +907,8 @@ namespace PeterDB {
                         out << "\"" << key << ":[";
                         break;
                 }
+            } else {
+                out << ", ";
             }
             switch(attribute.type) {
                 case AttrType::TypeInt:
@@ -784,20 +918,14 @@ namespace PeterDB {
                     offset += FLOATSIZE;
                     break;
                 case AttrType::TypeVarChar:
+                    length = *((int *) (data + offset));
                     offset += INTSIZE;
-                    length = *((int *) (data + offset + INTSIZE));
                     offset += length;
                     break;
             }
-            if(skip){
-                out << ",";
-            }
             out << "(" << *((unsigned int*)(data+offset)) << "," << *((unsigned short*)(data+offset+INTSIZE)) << ")";
-            if ( i == numberOfRecord -1 ){
-                out << "]\"";
-            }
         }
-        out << "]}";
+        out << "]\"]}";
         delete[] key;
         return SUCCESS;
     }
@@ -834,7 +962,7 @@ namespace PeterDB {
             currentSlot -= prev_numberOfRecord - numberOfRecord;
             prev_numberOfRecord = numberOfRecord;
         }
-        if (currentSlot == numberOfRecord) {
+        while (currentSlot == numberOfRecord) {
             offset = directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * currentSlot];
             currentPage = *(int*)(data + offset);;
             if (currentPage == 0) {
@@ -844,8 +972,9 @@ namespace PeterDB {
             storedIXFileHandle->readPage(currentPage, data);
             directory = (unsigned short*) data;
             numberOfRecord = directory[PAGE_SIZE/SHORTSIZE - NUMRECORD];
-            prev_numberOfRecord = numberOfRecord;
             currentSlot = 0;
+            prev_numberOfRecord = numberOfRecord;
+            numPageUsed++;
         }
         if (high == NULL) {
             offset = directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * currentSlot];
@@ -935,6 +1064,7 @@ namespace PeterDB {
         currentPage = ((unsigned*)data)[4];
         storedIXFileHandle->readPage(currentPage, data);
         prev_numberOfRecord = 0;
+        numPageUsed = 1;
         bool leafNode = ((unsigned short *) data)[PAGE_SIZE/SHORTSIZE - LEAFNODE] == 0;
         if (!leafNode) {
             getStartPage();

@@ -422,7 +422,8 @@ namespace PeterDBTesting {
         // 6. Delete all
 
         unsigned key;
-        unsigned numOfEntries = 1000 * 1000;
+        //unsigned numOfEntries = 1000 * 1000;
+        unsigned numOfEntries = 1000 * 10;
         unsigned seed = 581078, salt = 21414;
 
         // Insert entries
@@ -470,6 +471,9 @@ namespace PeterDBTesting {
         // Iterate
         count = 0;
         while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
+            if (count == 22769) {
+                int wait = 0;
+            }
             count++;
             validateRID(key, seed, salt);
             if (count % 200000 == 0) {
@@ -557,6 +561,7 @@ namespace PeterDBTesting {
 
         // Delete entries in IndexScan Iterator
         unsigned count = 0;
+        float prev_key = 0;
         while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
             count++;
 
@@ -564,7 +569,9 @@ namespace PeterDBTesting {
                 GTEST_LOG_(INFO) << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum;
             }
             ASSERT_EQ(ix.deleteEntry(ixFileHandle, heightAttr, &key, rid), success)
-                                        << "indexManager::deleteEntry() should succeed.";
+                                        << "indexManager::deleteEntry() should succeed. at " << count;
+
+            prev_key = key;
         }
 
         EXPECT_EQ(count, numOfEntries) << "scanned count should match inserted.";
@@ -705,6 +712,8 @@ namespace PeterDBTesting {
                 ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
                                             << "indexManager::printBTree() should succeed";
 
+                //GTEST_LOG_(INFO) << stream.str();
+
                 validateTree(stream, 5, 5, 1, 2);
             }
 
@@ -714,6 +723,7 @@ namespace PeterDBTesting {
         std::stringstream stream;
         ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
                                     << "indexManager::printBTree() should succeed.";
+        //LOG(INFO) << stream.str();
         validateTree(stream, numOfEntries, numOfEntries, 2, 2);
 
     }

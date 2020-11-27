@@ -60,6 +60,9 @@ namespace PeterDB {
 
         RC splitHalf(void * originalData, void * newData, unsigned originalPage, unsigned newPage);
 
+        RC splitHalfMiddleRight(void * originalData, void * newData, void *middleUp, unsigned &middleSize);
+        RC splitHalfMiddleLeft(void * originalData, void * newData, void *middleUp, unsigned &middleSize);
+
         RC shift(void * data, int offset, int slotToUse, const void * modifiedKey, int totalSize);
 
         RC shiftMiddleNode(void * data, int offset, int slotToUse, const void * modifiedKey, int totalSize);
@@ -136,6 +139,7 @@ namespace PeterDB {
         unsigned currentPage;
         unsigned currentSlot;
         unsigned prev_numberOfRecord;
+        unsigned numPageUsed;
     };
 
     class IXFileHandle {
