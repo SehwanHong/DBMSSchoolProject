@@ -5,7 +5,7 @@
 		<Option title="PeterDB"/>
 		<Option makefile_is_custom="1"/>
 		<Option compiler="gcc"/>
-		<Option virtualFolders="CMake Files\;CMake Files\googletest-prefix\;CMake Files\googletest-prefix\tmp\;CMake Files\googlelog-prefix\;CMake Files\googlelog-prefix\tmp\;CMake Files\src\;CMake Files\src\pfm\;CMake Files\src\rbfm\;CMake Files\src\ix\;CMake Files\src\rm\;CMake Files\test\;CMake Files\test\pfm\;CMake Files\test\rbfm\;CMake Files\test\ix\;CMake Files\test\rm\;"/>
+		<Option virtualFolders="CMake Files\;CMake Files\googletest-prefix\;CMake Files\googletest-prefix\tmp\;CMake Files\googlelog-prefix\;CMake Files\googlelog-prefix\tmp\;CMake Files\src\;CMake Files\src\pfm\;CMake Files\src\rbfm\;CMake Files\src\ix\;CMake Files\src\rm\;CMake Files\src\qe\;CMake Files\test\;CMake Files\test\pfm\;CMake Files\test\rbfm\;CMake Files\test\ix\;CMake Files\test\rm\;CMake Files\test\qe\;"/>
 		<Build>
 			<Target title="all">
 				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
@@ -209,6 +209,42 @@
 					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/rm/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/rm/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/rm/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="qe">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/libqe.a" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe"/>
+				<Option object_output="./"/>
+				<Option type="2"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 qe"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="qe/fast">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/libqe.a" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe"/>
+				<Option object_output="./"/>
+				<Option type="2"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 qe/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="pfmtest_private">
@@ -427,12 +463,51 @@
 					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
+			<Target title="qetest_public">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/qetest_public" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 qetest_public"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="qetest_public/fast">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/qetest_public" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 qetest_public/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
 		</Build>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/ix/ix.cc">
 			<Option target="ix"/>
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/pfm/pfm.cc">
 			<Option target="pfm"/>
+		</Unit>
+		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/qe.cc">
+			<Option target="qe"/>
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/rbfm/rbfm.cc">
 			<Option target="rbfm"/>
@@ -448,6 +523,9 @@
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/pfm/pfmtest_public.cc">
 			<Option target="pfmtest_public"/>
+		</Unit>
+		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/qetest_public.cc">
+			<Option target="qetest_public"/>
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rbfm/rbfmtest_private.cc">
 			<Option target="rbfmtest_private"/>
@@ -482,6 +560,9 @@
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/rm/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\src\rm\"/>
 		</Unit>
+		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/src/qe/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\src\qe\"/>
+		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\test\"/>
 		</Unit>
@@ -496,6 +577,9 @@
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\test\rm\"/>
+		</Unit>
+		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/qe/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\test\qe\"/>
 		</Unit>
 	</Project>
 </CodeBlocks_project_file>
