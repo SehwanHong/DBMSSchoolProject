@@ -616,7 +616,10 @@ namespace PeterDB {
     }
 
     RC RBFM_ScanIterator::close() {
-        delete[] (char*)pageData;
+        if (pageData != NULL) {
+            delete[] (char *) pageData;
+        }
+        pageData = NULL;
         //storedFileHandle.closeFile();
         return SUCCESS;
     }
@@ -803,27 +806,27 @@ namespace PeterDB {
     RC RBFM_ScanIterator::compareString(char *string, unsigned short number_of_char) {
         switch (comparisonOperation) {
             case CompOp::EQ_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) == 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) == 0;
                 return result;
             }
             case CompOp::GE_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) >= 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) >= 0;
                 return result;
             }
             case CompOp::GT_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) > 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) > 0;
                 return result;
             }
             case CompOp::LE_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) <= 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) <= 0;
                 return result;
             }
             case CompOp::LT_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) < 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) < 0;
                 return result;
             }
             case CompOp::NE_OP : {
-                bool result = memcmp(string, comparisonValue, number_of_char) != 0;
+                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) != 0;
                 return result;
             }
             case CompOp::NO_OP : {
@@ -862,8 +865,9 @@ namespace PeterDB {
                 if (scanAttr->at(scanAttrIndex) == AttributeDescriptor->at(i).name) {
                     unsigned char *saveAttribute = (unsigned char *) data;
                     if (nullBit) {
-                        unsigned char newMask = (unsigned) 1 << (unsigned) (7 - i % 8);
-                        dataNullIndicator[scanAttrIndex / 8] += newMask;
+                        unsigned char newMask = (unsigned) 1 << (unsigned) (7 - scanAttrIndex % 8);
+                        unsigned nullplace = scanAttrIndex / 8;
+                        dataNullIndicator[nullplace] += newMask;
                     } else {
                         switch (AttributeDescriptor->at(i).type) {
                             case AttrType::TypeInt: {

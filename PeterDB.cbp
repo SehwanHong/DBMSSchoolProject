@@ -427,6 +427,42 @@
 					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/ix/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
+			<Target title="rmtest_private">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/rmtest_private" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 rmtest_private"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rmtest_private/fast">
+				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/rmtest_private" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DDEBUG=1"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/include"/>
+					<Add directory="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 rmtest_private/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
 			<Target title="rmtest_public">
 				<Option output="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/rmtest_public" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11"/>
@@ -532,6 +568,9 @@
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rbfm/rbfmtest_public.cc">
 			<Option target="rbfmtest_public"/>
+		</Unit>
+		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/rmtest_private.cc">
+			<Option target="rmtest_private"/>
 		</Unit>
 		<Unit filename="/mnt/c/Users/sehwanhong/CLionProjects/cs222-fall20-team-11/test/rm/rmtest_public.cc">
 			<Option target="rmtest_public"/>

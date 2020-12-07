@@ -9,6 +9,7 @@
 #define RC_RM_CREATE_CATALOG_ERROR 7;
 #define RC_RM_DELETE_TABLE_ERROR 8;
 #define RC_COLUMN_READ_ERROR 9;
+#define RC_INSERT_TUPLE_ERROR 1000;
 
 namespace PeterDB {
 #define RM_EOF (-1)  // end of a scan operator
