@@ -31,7 +31,7 @@ namespace PeterDB {
         RC destroyFile(const std::string &fileName);                        // Destroy a file
         RC openFile(const std::string &fileName, FileHandle &fileHandle);   // Open a file
         RC closeFile(FileHandle &fileHandle);                               // Close a file
-        RC createFileHelper(char * fileName);
+        RC createFileHelper(const std::string &fileName);
 
     protected:
         PagedFileManager();                                                 // Prevent construction
@@ -62,6 +62,7 @@ namespace PeterDB {
 
         unsigned filesize;
         unsigned filesizecheck();
+        RC checkFilePointer();
 
         RC readPage(PageNum pageNum, void *data);                           // Get a specific page
         RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
@@ -70,7 +71,7 @@ namespace PeterDB {
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
                                 unsigned &appendPageCount);                 // Put current counter values into variables
 
-        char * savedFileName;                                               // Pointer to the file
+        std::string savedFileName;                                               // Pointer to the file
         FILE * filePointer;
     };
 

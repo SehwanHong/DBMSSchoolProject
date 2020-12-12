@@ -6,6 +6,8 @@
 
 #include "src/include/rbfm.h"
 
+#include "src/include/ix.h"
+
 #define RC_RM_CREATE_CATALOG_ERROR 7;
 #define RC_RM_DELETE_TABLE_ERROR 8;
 #define RC_COLUMN_READ_ERROR 9;
@@ -44,6 +46,11 @@ namespace PeterDB {
             // "key" follows the same format as in IndexManager::insertEntry()
             RC getNextEntry(RID &rid, void *key);    // Get next matching entry
             RC close();                              // Terminate index scan
+
+            RC open(std::string &indexName, Attribute &attribute, const void * lowKey, const void * highKey, bool lowKeyInclusive, bool highKeyInclusive);
+
+            IXFileHandle indexFileHandle;
+            IX_ScanIterator indexScanIterator;
     };
 
     // Relation Manager
@@ -109,12 +116,13 @@ namespace PeterDB {
         std::vector<Attribute> columnDescriptor;
         FileHandle tableFileHandle;
         FileHandle columnFileHandle;
-        std::vector<FileHandle> tableFileCollection;
+        //std::vector<FileHandle> tableFileCollection;
 
         unsigned tableID = 0;
         std::string previousTableName;
         std::vector<Attribute> previousRecordDescriptor;
         unsigned previousTableID = 0;
+        FileHandle previousFileHandle;
 
         RC createTableDescriptor();
         RC createColumnDescriptor();
@@ -123,6 +131,13 @@ namespace PeterDB {
         RC deleteAllTableFile();
         RC createTableCatalog();
         RC createColumnCatalog();
+        RC storeCurrentSystem(const std::string &tableName);
+
+        RC getAttribute(const void * data, std::vector<Attribute> &recordDescriptor, int &index, const void * key);
+
+        RC insertIndex(const std::string &tableName, const void * data, const RID &rid);
+        RC deleteIndex(const std::string &tableName, const void * data, const RID &rid);
+        RC destroyAllIndex(const std::string &tableName);
 
         unsigned getTableID(const std::string &tableName);
 

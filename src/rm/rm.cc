@@ -183,9 +183,8 @@ namespace PeterDB {
         RC problem = deleteAllTableFile();
         emptyTableDescriptor();
         emptyColumnDescriptor();
-        delete[] tableFileHandle.savedFileName;
-        delete[] columnFileHandle.savedFileName;
-        tableFileCollection.erase(tableFileCollection.begin(),tableFileCollection.end());
+        tableFileHandle.closeFile();
+        columnFileHandle.closeFile();
         problem += recordBasedFileManager.destroyFile(table);
         problem += recordBasedFileManager.destroyFile(column);
         return problem;
@@ -252,6 +251,18 @@ namespace PeterDB {
         return attributeData;
     }
 
+    RC RelationManager::storeCurrentSystem(const std::string &tableName) {
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        int problem = SUCCESS;
+        if (previousTableName != tableName ){ //} && previousRecordDescriptor.size() == 0) {
+            previousTableID = getTableID(tableName);
+            problem += getAttributes(tableName, previousRecordDescriptor);
+            previousTableName = tableName;
+            recordBasedFileManager.closeFile(previousFileHandle);
+            recordBasedFileManager.openFile(previousTableName, previousFileHandle);
+        }
+        return problem;
+    }
 
     RC RelationManager::createTable(const std::string &tableName, const std::vector<Attribute> &attrs) {
         if (!catalogCreated) {
@@ -273,15 +284,15 @@ namespace PeterDB {
             problem += recordBasedFileManager.insertRecord(columnFileHandle, columnDescriptor, columnData, rid);
             delete[] columnData;
         }
-        previousTableName = tableName;
-        previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
-        previousRecordDescriptor.insert(previousRecordDescriptor.begin(), attrs.begin(), attrs.end());
-        previousTableID = tableID;
-
+        if (previousTableName.size() != 0) {
+            previousTableName = tableName;
+            previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+            previousRecordDescriptor.insert(previousRecordDescriptor.begin(), attrs.begin(), attrs.end());
+            previousTableID = tableID;
+            recordBasedFileManager.closeFile(previousFileHandle);
+        }
         problem += recordBasedFileManager.createFile(tableName);
-        FileHandle fileHandle;
-        problem += recordBasedFileManager.openFile(tableName, fileHandle);
-        tableFileCollection.push_back(fileHandle);
+        problem += recordBasedFileManager.openFile(tableName, previousFileHandle);
 
         return problem;
     }
@@ -293,10 +304,12 @@ namespace PeterDB {
         int table_id = getTableID(tableName);
         RBFM_ScanIterator rbfmScanIterator;
         RC problem = SUCCESS;
-        char * temporary_saving = new char[5];
         if (table_id == 0) {
             return RC_RM_DELETE_TABLE_ERROR;
         }
+        char * temporary_saving = new char[5];
+
+        destroyAllIndex(tableName);
 
         recordBasedFileManager.scan(tableFileHandle, tableDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
         RID table;
@@ -320,21 +333,21 @@ namespace PeterDB {
             problem += recordBasedFileManager.deleteRecord(columnFileHandle, columnDescriptor, rids[i]);
         }
 
-        delete[] tableFileCollection.at(table_id-1).savedFileName;
-
         delete[] temporary_saving;
 
-        problem += recordBasedFileManager.destroyFile(tableName);
         if (previousTableName == tableName) {
             previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
             previousTableName = "";
             previousTableID = 0;
+            recordBasedFileManager.closeFile(previousFileHandle);
         }
+
+        problem += recordBasedFileManager.destroyFile(tableName);
         return problem;
     }
 
     RC RelationManager::getAttributes(const std::string &tableName, std::vector<Attribute> &attrs) {
-        if (previousTableName == tableName) {
+        if (previousTableName == tableName && &previousRecordDescriptor != &attrs) {
             attrs.erase(attrs.begin(), attrs.end());
             attrs.insert(attrs.begin(), previousRecordDescriptor.begin(), previousRecordDescriptor.end());
             return SUCCESS;
@@ -362,6 +375,16 @@ namespace PeterDB {
         char * temporary_saving = new char[5];
         RC problem = SUCCESS;
 
+        recordBasedFileManager.scan(tableFileHandle, tableDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
+        RID table;
+        while(rbfmScanIterator.getNextRecord(table, temporary_saving) != RBFM_EOF) {
+            rids.push_back(table);
+        }
+
+        if(rids.size() <=0) {
+            return RC_RM_DELETE_TABLE_ERROR;
+        }
+
         rids.erase(rids.begin(), rids.end());
 
         recordBasedFileManager.scan(columnFileHandle, columnDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
@@ -377,7 +400,7 @@ namespace PeterDB {
 
         for(int i = 0; i < rids.size(); i++) {
             char * record = new char[maxPossibleLength];
-            problem += recordBasedFileManager.readRecord(tableFileCollection.at(table_id-1), columnDescriptor, rids[i], record);
+            problem += recordBasedFileManager.readRecord(columnFileHandle, columnDescriptor, rids[i], record);
 
             unsigned int columnDescriptorLength = columnDescriptor.size();
             unsigned int nullBytes = columnDescriptorLength / 8 + (columnDescriptorLength % 8 == 0 ? 0 : 1);\
@@ -397,25 +420,34 @@ namespace PeterDB {
             offset += INTSIZE;
             switch(columnType) {
                 case 0 :
-                    attrs[columnPosition].type = AttrType::TypeInt;
+                    attrs[columnPosition - 1].type = AttrType::TypeInt;
                     break;
                 case 1 :
-                    attrs[columnPosition].type = AttrType::TypeReal;
+                    attrs[columnPosition - 1].type = AttrType::TypeReal;
                     break;
                 case 2 :
-                    attrs[columnPosition].type = AttrType::TypeVarChar;
+                    attrs[columnPosition - 1].type = AttrType::TypeVarChar;
                     break;
                 default:
                     delete[] record;
                     return RC_COLUMN_READ_ERROR;
             }
-            attrs[columnPosition].length = columnLength;
+            attrs[columnPosition - 1].length = columnLength;
             char * nameString = new char[columnNameLength + 1];
             memcpy(nameString, columnName, columnNameLength);
             nameString[columnNameLength] = '\0';
-            attrs[columnPosition].name = nameString;
+            attrs[columnPosition - 1].name = nameString;
             delete[] record;
             delete[] nameString;
+        }
+
+        if (previousTableName != tableName && &previousRecordDescriptor != &attrs) {
+            previousRecordDescriptor.erase(previousRecordDescriptor.begin(), previousRecordDescriptor.end());
+            previousRecordDescriptor.insert(previousRecordDescriptor.begin(), attrs.begin(), attrs.end());
+            previousTableID = getTableID(tableName);
+            previousTableName = tableName;
+            recordBasedFileManager.closeFile(previousFileHandle);
+            recordBasedFileManager.openFile(previousTableName, previousFileHandle);
         }
 
         delete[] temporary_saving;
@@ -470,12 +502,9 @@ namespace PeterDB {
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         FileHandle fileHandle;
         RC problem = SUCCESS;
-        if (previousTableName != tableName || previousRecordDescriptor.size() == 0) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
-        problem += recordBasedFileManager.insertRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, data, rid);
+        problem += storeCurrentSystem(tableName);
+        problem += recordBasedFileManager.insertRecord(previousFileHandle, previousRecordDescriptor, data, rid);
+        problem += insertIndex(previousTableName, data, rid);
         return problem;
     }
 
@@ -483,14 +512,19 @@ namespace PeterDB {
         if (access(tableName.c_str(), F_OK) != 0) {
             return RC_FILE_NAME_NOT_EXIST;
         }
+        if (table == tableName) {
+            return RC_INSERT_TUPLE_ERROR;
+        }
+        if (column == tableName) {
+            return RC_INSERT_TUPLE_ERROR;
+        }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         RC problem = SUCCESS;
-        if (previousTableName != tableName) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
-        problem += recordBasedFileManager.deleteRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid);
+        problem += storeCurrentSystem(tableName);
+        char * data = new char[PAGE_SIZE];
+        problem += recordBasedFileManager.readRecord(previousFileHandle, previousRecordDescriptor, rid, data);
+        problem += deleteIndex(previousTableName, data, rid);
+        problem += recordBasedFileManager.deleteRecord(previousFileHandle, previousRecordDescriptor, rid);
         return problem;
     }
 
@@ -500,12 +534,12 @@ namespace PeterDB {
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         RC problem = SUCCESS;
-        if (previousTableName != tableName) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
-        problem += recordBasedFileManager.updateRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, data, rid);
+        problem += storeCurrentSystem(tableName);
+        char * prevData = new char[PAGE_SIZE];
+        problem += recordBasedFileManager.readRecord(previousFileHandle, previousRecordDescriptor, rid, prevData);
+        problem += deleteIndex(previousTableName, prevData, rid);
+        problem += recordBasedFileManager.updateRecord(previousFileHandle, previousRecordDescriptor, data, rid);
+        problem += insertIndex(previousTableName, data, rid);
         return problem;
     }
 
@@ -515,12 +549,8 @@ namespace PeterDB {
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         RC problem = SUCCESS;
-        if (previousTableName != tableName) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
-        problem += recordBasedFileManager.readRecord(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid, data);
+        problem += storeCurrentSystem(tableName);
+        problem += recordBasedFileManager.readRecord(previousFileHandle, previousRecordDescriptor, rid, data);
         return problem;
     }
 
@@ -538,12 +568,8 @@ namespace PeterDB {
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         RC problem = SUCCESS;
-        if (previousTableName != tableName) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
-        problem += recordBasedFileManager.readAttribute(tableFileCollection[previousTableID-1], previousRecordDescriptor, rid, attributeName, data);
+        problem += storeCurrentSystem(tableName);
+        problem += recordBasedFileManager.readAttribute(previousFileHandle, previousRecordDescriptor, rid, attributeName, data);
         return problem;
     }
 
@@ -559,11 +585,6 @@ namespace PeterDB {
         }
         RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
         RC problem = SUCCESS;
-        if (previousTableName != tableName) {
-            problem += getAttributes(tableName, previousRecordDescriptor);
-            previousTableID = getTableID(tableName);
-            previousTableName = tableName;
-        }
         if (table == tableName) {
             rm_ScanIterator.open(tableFileHandle, tableDescriptor, attributeNames, conditionAttribute, compOp, value);
             return SUCCESS;
@@ -572,23 +593,234 @@ namespace PeterDB {
             rm_ScanIterator.open(columnFileHandle, columnDescriptor, attributeNames, conditionAttribute, compOp, value);
             return SUCCESS;
         }
-        rm_ScanIterator.open(tableFileCollection[previousTableID-1], previousRecordDescriptor, attributeNames, conditionAttribute, compOp, value);
+        problem += storeCurrentSystem(tableName);
+        rm_ScanIterator.open(previousFileHandle, previousRecordDescriptor, attributeNames, conditionAttribute, compOp, value);
         return problem;
     }
 
     RC RelationManager::createIndex(const std::string &tableName, const std::string &attributeName) {
+        std::string indexName = tableName + attributeName + ".idx";
 
+        IndexManager &indexManager = IndexManager::instance();
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        indexManager.createFile(indexName);
+
+        int problem = SUCCESS;
+        std::vector<std::string> projection;
+        projection.push_back(attributeName);
+
+        std::vector<Attribute> indexAttribute;
+
+        createTable(indexName, indexAttribute);
+        problem += storeCurrentSystem(tableName);
+
+        RBFM_ScanIterator rbfmScanIterator;
+
+        int attributeLocation;
+        for( attributeLocation = 0 ; attributeLocation < previousRecordDescriptor.size(); attributeLocation++ ){
+            if (previousRecordDescriptor.at(attributeLocation).name == attributeName) {
+                break;
+            }
+        }
+
+        problem += recordBasedFileManager.scan(previousFileHandle, previousRecordDescriptor, previousRecordDescriptor.at(attributeLocation).name, NO_OP, NULL, projection, rbfmScanIterator);
+
+        RID newRid;
+        char* data = new char[PAGE_SIZE];
+        while (rbfmScanIterator.getNextRecord(newRid, data) != RBFM_EOF) {
+            IXFileHandle indexFileHandle;
+            problem += indexManager.openFile(indexName, indexFileHandle);
+            problem += indexManager.insertEntry(indexFileHandle, previousRecordDescriptor.at(attributeLocation), data + 1, newRid);
+            indexManager.closeFile(indexFileHandle);
+        }
+
+        delete[] data;
+        return problem;
+    }
+
+    RC RelationManager::getAttribute(const void *data, std::vector<Attribute> &recordDescriptor,
+                                     int &index, const void *key) {
+        // calculate how many bytes data is using
+        unsigned int length = recordDescriptor.size();
+        unsigned int null_bytes = length / 8 + (length % 8 == 0 ? 0 : 1); // get number of bytes that indicate null
+
+        unsigned char * null_indicator = new unsigned char[null_bytes];
+        unsigned offset = 0;
+        bool nullBit = false;
+        memcpy(null_indicator, (char*)data+offset, null_bytes);
+        offset += null_bytes;
+        for(int i = 0 ; i < length ; i++ ){
+            unsigned int number_of_char = 0;
+            unsigned char * readAttr = (unsigned char*) key;
+            unsigned char mask = (unsigned)1 << (unsigned) (7 - i % 8);
+
+            nullBit = null_indicator[i/8] & mask;
+
+            if ( i == index ) {
+                switch (recordDescriptor[i].type) {
+                    case AttrType::TypeInt:
+                        memcpy((char*)key, (char*)data + offset, INTSIZE);
+                        break;
+                    case AttrType::TypeReal:
+                        memcpy((char*)key, (char*)data + offset, FLOATSIZE);
+                    case AttrType::TypeVarChar:
+                        unsigned int number_of_char =  *((unsigned int * )((char*)data+offset));
+                        memcpy((char*)key, (char*)data + offset, INTSIZE);
+                        offset += INTSIZE;
+                        memcpy((char*)key + INTSIZE, (char*)data + offset, number_of_char);
+                }
+                break;
+            }
+            if (!nullBit){
+                switch (recordDescriptor[i].type) {
+                    case AttrType::TypeInt:
+                        offset += INTSIZE; break;
+                    case AttrType::TypeReal:
+                        offset += FLOATSIZE; break;
+                    case AttrType::TypeVarChar:
+                        unsigned int number_of_char =  *((unsigned int * )((char*)data+offset));
+                        offset += INTSIZE;
+                        offset += number_of_char;
+                }
+            }
+        }
+        delete[] null_indicator;
         return SUCCESS;
     }
 
+    RC RelationManager::insertIndex(const std::string &tableName, const void * data, const RID &rid){
+        int problem = SUCCESS;
+        problem += storeCurrentSystem(tableName);
+
+        std::vector<int> existingIndexAttributeNumber;
+        std::vector<std::string> existingIndexFileName;
+
+        IndexManager &indexManager = IndexManager::instance();
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+
+        for(int i = 0; i < previousRecordDescriptor.size(); i++) {
+            std::string indexName = tableName + previousRecordDescriptor.at(i).name + ".idx";
+            int tableID = getTableID(indexName);
+            if (tableID != 0) {
+                existingIndexAttributeNumber.push_back(i);
+                existingIndexFileName.push_back(indexName);
+            }
+        }
+
+        char * key = new char[PAGE_SIZE];
+        for(int i = 0; i < existingIndexAttributeNumber.size(); i++) {
+            int index = existingIndexAttributeNumber.at(i);
+            IXFileHandle indexFileHandle;
+            problem += indexManager.openFile(existingIndexFileName.at(i), indexFileHandle);
+            problem += getAttribute(data, previousRecordDescriptor, index, key);
+            problem += indexManager.insertEntry(indexFileHandle, previousRecordDescriptor.at(index), key, rid);
+            indexManager.closeFile(indexFileHandle);
+        }
+        delete[] key;
+
+        return problem;
+    }
+
+    RC RelationManager::deleteIndex(const std::string &tableName, const void * data, const RID &rid) {
+        int problem = SUCCESS;
+        problem += storeCurrentSystem(tableName);
+
+        std::vector<int> existingIndexAttributeNumber;
+        std::vector<std::string> existingIndexFileName;
+
+        IndexManager &indexManager = IndexManager::instance();
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+
+        for(int i = 0; i < previousRecordDescriptor.size(); i++) {
+            std::string indexName = tableName + previousRecordDescriptor.at(i).name + ".idx";
+            int tableID = getTableID(indexName);
+            if (tableID != 0) {
+                existingIndexAttributeNumber.push_back(i);
+                existingIndexFileName.push_back(indexName);
+            }
+        }
+
+        char * key = new char[PAGE_SIZE];
+        for(int i = 0; i < existingIndexAttributeNumber.size(); i++) {
+            int index = existingIndexAttributeNumber.at(i);
+            IXFileHandle indexFileHandle;
+            problem += indexManager.openFile(existingIndexFileName.at(i), indexFileHandle);
+            problem += getAttribute(data, previousRecordDescriptor, index, key);
+            problem += indexManager.deleteEntry(indexFileHandle, previousRecordDescriptor.at(index), key, rid);
+            indexManager.closeFile(indexFileHandle);
+        }
+        delete[] key;
+
+        return problem;
+    }
+
     RC RelationManager::destroyIndex(const std::string &tableName, const std::string &attributeName) {
-        return SUCCESS;
+        std::string indexName = tableName + attributeName + ".idx";
+        int problem = SUCCESS;
+        IndexManager &indexManager = IndexManager::instance();
+        problem += indexManager.destroyFile(indexName);
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+        std::vector<std::string> projectedAttribute = {"table-id"};
+        std::vector<RID> rids;
+        int table_id = getTableID(indexName);
+        RBFM_ScanIterator rbfmScanIterator;
+        char * temporary_saving = new char[5];
+        if (table_id == 0) {
+            return RC_RM_DELETE_TABLE_ERROR;
+        }
+
+        recordBasedFileManager.scan(tableFileHandle, tableDescriptor, "table-id", EQ_OP, &table_id, projectedAttribute, rbfmScanIterator);
+        RID table;
+        while(rbfmScanIterator.getNextRecord(table, temporary_saving) != RBFM_EOF) {
+            rids.push_back(table);
+        }
+
+        if (rids.size() <= 0) {
+            return RC_RM_DELETE_TABLE_ERROR;
+        }
+
+        problem += recordBasedFileManager.deleteRecord(tableFileHandle, tableDescriptor, rids.at(0));
+
+        delete[] temporary_saving;
+        return problem;
+    }
+
+    RC RelationManager::destroyAllIndex(const std::string &tableName) {
+        int problem = SUCCESS;
+        problem += storeCurrentSystem(tableName);
+
+        IndexManager &indexManager = IndexManager::instance();
+        RecordBasedFileManager &recordBasedFileManager = RecordBasedFileManager::instance();
+
+        for(int i = 0; i < previousRecordDescriptor.size(); i++) {
+            std::string indexName = tableName + previousRecordDescriptor.at(i).name + ".idx";
+            int tableID = getTableID(indexName);
+            if (tableID != 0) {
+                destroyIndex(tableName, previousRecordDescriptor.at(i).name);
+            }
+        }
+
+        return problem;
     }
 
     RC RelationManager::indexScan(const std::string &tableName, const std::string &attributeName, const void *lowKey,
                                   const void *highKey, bool lowKeyInclusive, bool highKeyInclusive,
                                   RM_IndexScanIterator &rm_IndexScanIterator) {
-        return SUCCESS;
+
+        std::string indexName = tableName + attributeName + ".idx";
+        if (access(indexName.c_str(), F_OK) != 0) {
+            return RC_FILE_NAME_NOT_EXIST;
+        }
+        int problem = SUCCESS;
+        problem = storeCurrentSystem(tableName);
+        int index;
+        for( index = 0; index < previousRecordDescriptor.size(); index++ ) {
+            if (attributeName == previousRecordDescriptor.at(index).name) {
+                break;
+            }
+        }
+        problem += rm_IndexScanIterator.open(indexName, previousRecordDescriptor.at(index), lowKey, highKey, lowKeyInclusive, highKeyInclusive);
+        return problem;
     }
 
     RM_ScanIterator::RM_ScanIterator() = default;
@@ -615,7 +847,42 @@ namespace PeterDB {
         storedDescriptor.erase(storedDescriptor.begin(), storedDescriptor.end());
         storedDescriptor.insert(storedDescriptor.begin(), recordDescriptor.begin(), recordDescriptor.end());
         scanIterator.open(fileHandle, storedDescriptor, attributeName, conditionAttribute, comparisonOperation, comparisonValue);
+        scanIterator.storedFileHandle.checkFilePointer();
         failsOpen = false;
+    }
+
+    RM_IndexScanIterator::RM_IndexScanIterator() = default;
+
+    RM_IndexScanIterator::~RM_IndexScanIterator() = default;
+
+    RC RM_IndexScanIterator::open(std::string &indexName,
+                                  Attribute &attribute,
+                                  const void *lowKey,
+                                  const void *highKey,
+                                  bool lowKeyInclusive,
+                                  bool highKeyInclusive) {
+        IndexManager &indexManager = IndexManager::instance();
+        int problem = SUCCESS;
+
+        problem += indexManager.openFile(indexName, indexFileHandle);
+        problem += indexManager.scan(indexFileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive, indexScanIterator);
+        return problem;
+    }
+
+    RC RM_IndexScanIterator::close() {
+        IndexManager &indexManager = IndexManager::instance();
+        int problem = SUCCESS;
+        problem += indexManager.closeFile(indexFileHandle);
+        problem += indexScanIterator.close();
+        return SUCCESS;
+    }
+
+    RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key) {
+        int problem = indexScanIterator.getNextEntry(rid, key);
+        if (problem == IX_EOF) {
+            problem = RM_EOF;
+        }
+        return problem;
     }
 
     // Extra credit work

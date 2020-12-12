@@ -93,7 +93,7 @@ namespace PeterDB {
 
         RC compareFloat(float realNumber);
 
-        RC compareString(char * string, unsigned short number_of_char);
+        RC compareString(char * string, unsigned number_of_char);
 
         RC selectAttribute(void * record, void * data);
 

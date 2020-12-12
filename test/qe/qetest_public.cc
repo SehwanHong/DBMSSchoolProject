@@ -286,6 +286,9 @@ namespace PeterDBTesting {
             ASSERT_EQ(rm.printTuple(attrs, outBuffer, stream), success)
                                         << "RelationManager.printTuple() should succeed.";
             printed.emplace_back(stream.str());
+            if (printed.size() == 89) {
+                int check = 0;
+            }
             memset(outBuffer, 0, bufSize);
         }
 
@@ -580,12 +583,15 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         unsigned numPartitions = 10;
+        unsigned numberOfTuple = 1000;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 10000);
+        //createAndPopulateTable(leftTableName, {}, 10000);
+        createAndPopulateTable(leftTableName, {}, numberOfTuple);
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 10000);
+        //createAndPopulateTable(rightTableName, {}, 10000);
+        createAndPopulateTable(rightTableName, {}, numberOfTuple);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -612,11 +618,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < numberOfTuple; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 10000; j++) {
+            for (int j = 0; j < numberOfTuple; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;
@@ -652,12 +658,15 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         unsigned numPartitions = 7;
+        unsigned numberOfTuple = 1000;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 10000);
+        //createAndPopulateTable(leftTableName, {}, 10000);
+        createAndPopulateTable(leftTableName, {}, numberOfTuple);
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 10000);
+        //createAndPopulateTable(rightTableName, {}, 10000);
+        createAndPopulateTable(rightTableName, {}, numberOfTuple);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -683,11 +692,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < numberOfTuple; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 10000; j++) {
+            for (int j = 0; j < numberOfTuple; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;

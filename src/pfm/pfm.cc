@@ -22,8 +22,8 @@ namespace PeterDB {
         return pointer;
     }
 
-    RC PagedFileManager::createFileHelper(char *fileName) {
-        FILE * pFile = std::fopen(fileName, "wb"); // create a binary file
+    RC PagedFileManager::createFileHelper(const std::string &fileName) {
+        FILE * pFile = fopen(fileName.c_str(), "wb"); // create a binary file
         unsigned* header = new unsigned[PAGE_SIZE/UNSIGNEDSIZE];
         for(int i = 0 ; i < 4; i++){ header[i] = 0; } // set first four values to zero read write append pages count
         for(int i = 4 ; i < PAGE_SIZE/UNSIGNEDSIZE; i++){ header[i] = -1; } // else save -1 as hidden
@@ -31,7 +31,7 @@ namespace PeterDB {
         delete[] header;
         std::fclose(pFile);
 
-        pFile = std::fopen(fileName, "rb"); // check if file is save correctly with correct Page_size
+        pFile = std::fopen(fileName.c_str(), "rb"); // check if file is save correctly with correct Page_size
         std::fseek(pFile, 0, SEEK_END);
         unsigned length = std::ftell(pFile);
         if (length != PAGE_SIZE) {
@@ -41,13 +41,10 @@ namespace PeterDB {
     }
 
     RC PagedFileManager::createFile(const std::string &fileName) {
-        char * name = String_to_char_point(fileName);
-        if (access(name, F_OK) == 0) { // check if the file name exists
-            delete[] name;
+        if (access(fileName.c_str(), F_OK) == 0) { // check if the file name exists
             return RC_FILE_NAME_EXIST;
         } else {
-            createFileHelper(name);
-            delete[] name;
+            createFileHelper(fileName);
             return SUCCESS;
         }
     }
@@ -94,17 +91,15 @@ namespace PeterDB {
         appendPageCounter = 0;
         numberOfPages = 0;
         filesize = 0;
-        savedFileName = NULL;
+        filePointer = NULL;
     }
 
     FileHandle::~FileHandle() = default;
 
     RC FileHandle::generateHeader(const std::string &fileName) { // get string of file name and save as pointer to filename
         int len = fileName.size();
-        savedFileName  = new char[len+1];
-        std::copy(fileName.begin(), fileName.end(), savedFileName);
-        savedFileName[len] = '\0';
-        filePointer = std::fopen(savedFileName, "rb+");
+        savedFileName = fileName;
+        filePointer = std::fopen(savedFileName.c_str(), "rb+");
         getHeader();
         filesizecheck();
         unsigned temp = filesize;
@@ -157,10 +152,11 @@ namespace PeterDB {
     }
 
     RC FileHandle::closeFile() {
-        saveHeader();
-        std::fclose(filePointer);
-        delete[] savedFileName;
-        savedFileName = NULL;
+        if (filePointer != NULL) {
+            saveHeader();
+            std::fclose(filePointer);
+            filePointer = NULL;
+        }
         return SUCCESS;
     }
 
@@ -170,6 +166,14 @@ namespace PeterDB {
         std::fseek(filePointer, 0L, SEEK_SET);
     }
 
+    RC FileHandle::checkFilePointer() {
+        if (filePointer != NULL) {
+            saveHeader();
+            std::fclose(filePointer);
+        }
+        filePointer = std::fopen(savedFileName.c_str(), "rb+");
+    }
+
     RC FileHandle::readPage(PageNum pageNum, void *data) {
         if (pageNum > numberOfPages){ // check if the page number is invalid
             return RC_READ_NONEXISTENT_PAGE;
@@ -177,6 +181,9 @@ namespace PeterDB {
             return RC_READ_NONEXISTENT_PAGE;
         }
         readPageCounter++;
+        if(filePointer == NULL) {
+            checkFilePointer();
+        }
 
         filesizecheck();
         unsigned temp = filesize;
@@ -212,6 +219,10 @@ namespace PeterDB {
             return RC_FILE_SIZE_ERROR;
         }
 
+        if(filePointer == NULL) {
+            checkFilePointer();
+        }
+
 
         std::fseek(filePointer, PAGE_SIZE*(pageNum+1), SEEK_SET); // move file pointer to the start of page
         std::fwrite(data, 1, PAGE_SIZE, filePointer); //overwrite data
@@ -235,6 +246,10 @@ namespace PeterDB {
             return RC_FILE_SIZE_ERROR;
         }
         numberOfPages++;
+
+        if(filePointer == NULL) {
+            checkFilePointer();
+        }
 
         std::fseek(filePointer, 0L, SEEK_END);
         std::fwrite(data, 1, PAGE_SIZE, filePointer); // write a new data

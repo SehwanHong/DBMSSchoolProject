@@ -3,9 +3,14 @@
 
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <cfloat>
+
+#include <sstream>
 
 #include "rm.h"
 #include "ix.h"
+
 
 namespace PeterDB {
 
@@ -155,6 +160,10 @@ namespace PeterDB {
     };
 
     class Filter : public Iterator {
+        Iterator * iter;
+        Condition filterCondition;
+        std::vector<Attribute> Attributes;
+
         // Filter operator
     public:
         Filter(Iterator *input,               // Iterator of input R
@@ -165,11 +174,20 @@ namespace PeterDB {
 
         RC getNextTuple(void *data) override;
 
+        bool checkPassTest(void * data);
+
+        bool compareInteger(int integer);
+        bool compareFloat(float realNumber);
+        bool compareString(char *string, unsigned number_of_char);
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
     class Project : public Iterator {
+        Iterator * iter;
+        std::vector<std::string> projectAttribute;
+        std::vector<Attribute> Attributes;
         // Projection operator
     public:
         Project(Iterator *input,                                // Iterator of input R
@@ -178,11 +196,29 @@ namespace PeterDB {
 
         RC getNextTuple(void *data) override;
 
+        RC selectAttribute(void * tuple, void *data);
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
     class BNLJoin : public Iterator {
+        Iterator * left;
+        TableScan * right;
+        Condition joinCondition;
+        unsigned numberOfPages;
+        char * pageBlock;
+        char * rightTuple;
+        char * leftTuple;
+        std::vector<Attribute> leftAttribute;
+        std::vector<Attribute> rightAttribute;
+        std::vector<Attribute> joinAttribute;
+        int leftEndOfFile;
+        std::unordered_map<std::string, std::vector<Value>> blockHash;
+        AttrType attrType;
+        int leftIndex;
+        int rightIndex;
+        std::vector<Value> leftValues;
         // Block nested-loop join operator
     public:
         BNLJoin(Iterator *leftIn,            // Iterator of input R
@@ -196,11 +232,37 @@ namespace PeterDB {
 
         RC getNextTuple(void *data) override;
 
+        RC updatePageBlock();
+        int getMaxLength();
+        int getDataSize();
+        RC getLeftKey(std::string & Key);
+        RC getRightKey(std::string & Key);
+
+        RC setLeftValues();
+        bool compareInt(int leftInteger, int rightInteger);
+        bool compareFloat(float leftFloat, float rightFloat);
+        bool compareVarChar(char * leftString, char* rightString, int leftNumChar, int rightNumChar);
+
+        bool passJoinTest(Value &leftValue);
+        RC joinTuple(void * leftValue, void * data);
+        RC getAttrType();
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
     class INLJoin : public Iterator {
+        Iterator * left;
+        IndexScan * right;
+        Condition joinCondition;
+        char * rightTuple;
+        char * leftTuple;
+        std::vector<Attribute> leftAttribute;
+        std::vector<Attribute> rightAttribute;
+        std::vector<Attribute> joinAttribute;
+        int leftEndOfFile;
+        int rightEndOfFile;
+
         // Index nested-loop join operator
     public:
         INLJoin(Iterator *leftIn,           // Iterator of input R
@@ -212,14 +274,43 @@ namespace PeterDB {
 
         RC getNextTuple(void *data) override;
 
+        bool passJoinTest();
+        RC joinTuple(void * data);
+        int getLeftKey();
+        int getRightKey();
+
+        bool compareInt(int leftInteger, int rightInteger);
+        bool compareFloat(float leftFloat, float rightFloat);
+        bool compareVarChar(char * leftString, char* rightString, int leftNumChar, int rightNumChar);
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
     // 10 extra-credit points
     class GHJoin : public Iterator {
+        std::vector<std::string> leftPartition;
+        std::vector<std::string> rightPartition;
+        std::vector<Attribute> joinAttribute;
+        std::vector<Attribute> leftAttribute;
+        std::vector<Attribute> rightAttribute;
+        Condition joinCondition;
+        int numberPartition;
+
+        TableScan * leftIter;
+        TableScan * rightIter;
+        BNLJoin * bnlJoin;
+
+        int count;
+
+        bool created;
+        int bnlEndOfFile;
+        int callCount = -1;
         // Grace hash join operator
     public:
+
+        RelationManager &relationManager = RelationManager::instance();
+
         GHJoin(Iterator *leftIn,               // Iterator of input R
                Iterator *rightIn,               // Iterator of input S
                const Condition &condition,      // Join condition (CompOp is always EQ)
@@ -230,11 +321,26 @@ namespace PeterDB {
 
         RC getNextTuple(void *data) override;
 
+        RC buildPartition(Iterator * iter, bool isLeft, std::vector<std::string> &fileName);
+
+        int getValue(void * record, std::vector<Attribute> & recordDescriptor, std::string & attributeName);
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
     class Aggregate : public Iterator {
+        bool isGroupBy;
+        AggregateOp aggregateOp;
+        Iterator * iter;
+        Attribute aggregateAttribute;
+        Attribute groupAttribute;
+        std::vector<Attribute> aggregateAttributes;
+        char * tuple;
+        bool endOfFile;
+        std::vector<Attribute> iterAttribute;
+        std::vector<std::string> keys;
+        std::unordered_map<std::string, float> aggregatedValueMap;
         // Aggregation operator
     public:
         // Mandatory
@@ -255,6 +361,20 @@ namespace PeterDB {
         ~Aggregate() override;
 
         RC getNextTuple(void *data) override;
+
+        RC getValue(void * tuple, float & value);
+
+        RC getKey(void * tuple, std::string &Key);
+
+        RC aggregateNoGroup();
+
+        RC aggregateGroup();
+
+        float noGroupAvg();
+        float noGroupCount();
+        float noGroupMax();
+        float noGroupMin();
+        float noGroupSum();
 
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX

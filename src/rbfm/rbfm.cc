@@ -601,7 +601,12 @@ namespace PeterDB {
     }
 
     RC RBFM_ScanIterator::open(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const std::vector<std::string> &attributeName, const std::string &conditionAttribute, const CompOp compOp, const void *value) {
-        storedFileHandle = fileHandle;
+        storedFileHandle.savedFileName = fileHandle.savedFileName;
+        storedFileHandle.numberOfPages = fileHandle.numberOfPages;
+        storedFileHandle.readPageCounter = fileHandle.readPageCounter;
+        storedFileHandle.writePageCounter = fileHandle.writePageCounter;
+        storedFileHandle.appendPageCounter = fileHandle.appendPageCounter;
+        storedFileHandle.filePointer = fileHandle.filePointer;
         pageData = new char[PAGE_SIZE];
         storedFileHandle.readPage(0,pageData);
         currentPageNum = 0;
@@ -636,7 +641,7 @@ namespace PeterDB {
             slotOffSet = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum];
             dataSize = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum + 1];
 
-            while(!correctSlotOffSetDataSize(slotOffSet,dataSize)) {
+            while(!correctSlotOffSetDataSize(slotOffSet, dataSize)) {
                 result = updatePageSlotNum();
                 slotOffSet = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum];
                 dataSize = slotDirectory[PAGE_SIZE/SHORTSIZE - 4 - 2*currentSlotNum + 1];
@@ -803,35 +808,42 @@ namespace PeterDB {
         }
     }
 
-    RC RBFM_ScanIterator::compareString(char *string, unsigned short number_of_char) {
-        switch (comparisonOperation) {
-            case CompOp::EQ_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) == 0;
-                return result;
+    RC RBFM_ScanIterator::compareString(char *string, unsigned number_of_char) {
+        int max = 0;
+        if (comparisonOperation != CompOp::NO_OP) {
+            if (number_of_char > *((int *) comparisonValue)) {
+                max = number_of_char;
+            } else {
+                max = *((int *) comparisonValue);
             }
-            case CompOp::GE_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) >= 0;
-                return result;
+            switch (comparisonOperation) {
+                case CompOp::EQ_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) == 0;
+                    return result;
+                }
+                case CompOp::GE_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) >= 0;
+                    return result;
+                }
+                case CompOp::GT_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) > 0;
+                    return result;
+                }
+                case CompOp::LE_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) <= 0;
+                    return result;
+                }
+                case CompOp::LT_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) < 0;
+                    return result;
+                }
+                case CompOp::NE_OP : {
+                    bool result = memcmp(string, (char *) comparisonValue + INTSIZE, max) != 0;
+                    return result;
+                }
             }
-            case CompOp::GT_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) > 0;
-                return result;
-            }
-            case CompOp::LE_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) <= 0;
-                return result;
-            }
-            case CompOp::LT_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) < 0;
-                return result;
-            }
-            case CompOp::NE_OP : {
-                bool result = memcmp(string, (char*)comparisonValue + INTSIZE, number_of_char) != 0;
-                return result;
-            }
-            case CompOp::NO_OP : {
-                return true;
-            }
+        } else {
+            return true;
         }
     }
 

@@ -964,9 +964,12 @@ namespace PeterDB {
             currentSlot -= prev_numberOfRecord - numberOfRecord;
             prev_numberOfRecord = numberOfRecord;
         }
+        if (currentPage > storedIXFileHandle->numberOfPages) {
+            return IX_EOF;
+        }
         while (currentSlot == numberOfRecord) {
             offset = directory[PAGE_SIZE/SHORTSIZE - 5 - 2 * currentSlot];
-            currentPage = *(int*)(data + offset);;
+            currentPage = *(int*)(data + offset);
             if (currentPage == 0) {
                 return IX_EOF;
             }
@@ -1170,10 +1173,18 @@ namespace PeterDB {
     }
 
     int IX_ScanIterator::compareVarChar(int offset) {
+        int lowlen = *((int*)low);
+        int highlen = *((int*)((char*)data + offset));
+        int max;
+        if (lowlen > highlen) {
+            max = lowlen;
+        } else {
+            max = highlen;
+        }
         if (low == NULL) {
             return 0;
         } else {
-            int comp = memcmp(low+INTSIZE, data+offset+INTSIZE, *((int*)low));
+            int comp = memcmp(low+INTSIZE, data+offset+INTSIZE, max);
             if (comp < 0) {
                 return 0;
             } else if (comp > 0) {
@@ -1301,7 +1312,7 @@ namespace PeterDB {
         tempPointer[3] = numberOfPages;
         tempPointer[4] = rootNode;
         tempPointer[5] = height;
-        for(int i = 5; i < PAGE_SIZE/UNSIGNEDSIZE; i++){
+        for(int i = 6; i < PAGE_SIZE/UNSIGNEDSIZE; i++){
             tempPointer[i] = -1;
         }
     }
