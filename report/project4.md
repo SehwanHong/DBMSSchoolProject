@@ -12,7 +12,7 @@
 
 ### 2. Catalog information about Index
 - Show your catalog information about an index (tables, columns).
-![record format](project4-1.jpg)
+![record format](Project4-1.jpg)
  
  * Storing index is similar to storing normal File. Instead uses different IndexName and File Name;
  * For Index, do not need to store column data because access to index only happens inside the Relation Manager
